@@ -137,23 +137,6 @@ ifdef PROGRAM_OUTPUT_FILTER
 	$(PROGRAM_OUTPUT_FILTER) $@
 endif
 
-
-#Here we run the program
-$(PROGRAMS_TO_TEST:%=Output/%.out-llc-instr): \
-Output/%.out-llc-instr: Output/%.llc-instr
-	$(VERB) $(RM) -f Output/llc-instr-$(RUN_TYPE)/loops.out
-	$(SPEC_SANDBOX) llc-instr-$(RUN_TYPE) $@ $(REF_IN_DIR) $(RUNSAFELY) $(STDIN_FILENAME) $(STDOUT_FILENAME) ../$*.llc-instr $(RUN_OPTIONS)
-	echo $(CURDIR)
-	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.loops.out.info mv Output/llc-instr-$(RUN_TYPE)/loops.out Output/$*.loops.out 
-	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.out-llc-instr-loops /bin/bash $(PROCESSLOOPS) Output/$*.loops.out               
-	-(cd Output/llc-instr-$(RUN_TYPE); cat $(LOCAL_OUTPUTS)) | \
-	  $(SPEC_OUTPUT_FILE_FILTER) > $@
-	cp Output/llc-instr-$(RUN_TYPE)/$(STDOUT_FILENAME).time $@.time
-ifdef PROGRAM_OUTPUT_FILTER
-	$(PROGRAM_OUTPUT_FILTER) $@
-endif
-
-
 $(PROGRAMS_TO_TEST:%=Output/%.out-llc-beta): \
 Output/%.out-llc-beta: Output/%.llc-beta
 	$(SPEC_SANDBOX) llc-beta-$(RUN_TYPE) $@ $(REF_IN_DIR) \
