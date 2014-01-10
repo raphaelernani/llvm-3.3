@@ -445,6 +445,29 @@ void Graph::dfsVisitBack(GraphNode* u, std::set<GraphNode*> &visitedNodes) {
 }
 
 
+
+
+
+
+void Graph::dfsVisitBack_ext(GraphNode* u, std::set<GraphNode*> &visitedNodes, std::map<int, GraphNode*> &firstNodeVisitedPerSCC){
+
+    visitedNodes.insert(u);
+    int SCCID = getSCCID(u);
+
+    if (!firstNodeVisitedPerSCC.count(SCCID)) firstNodeVisitedPerSCC[SCCID] = u;
+
+    std::map<GraphNode*, edgeType> preds = u->getPredecessors();
+
+    for (std::map<GraphNode*, edgeType>::iterator pred = preds.begin(), s_end =
+                    preds.end(); pred != s_end; pred++) {
+		if (visitedNodes.count(pred->first) == 0) {
+			dfsVisitBack_ext(pred->first, visitedNodes, firstNodeVisitedPerSCC);
+		}
+    }
+
+}
+
+
 bool lookForNestedLoop( GraphNode* first,
 						GraphNode* current,
 						std::set<GraphNode*> &currentpath ,
@@ -1251,7 +1274,6 @@ void llvm::Graph::getAcyclicPaths_rec(
 	std::map<GraphNode*, edgeType> succs = u->getSuccessors();
 	for (std::map<GraphNode*, edgeType>::iterator succ = succs.begin(), s_end =
 					succs.end(); succ != s_end; succ++) {
-		if (visitedNodes.count(succ->first) != 0) continue;
 
 		if(succ->first == dst){
 			path.push(dst);
@@ -1275,12 +1297,12 @@ void llvm::Graph::getAcyclicPaths_rec(
 
 		if (result.size() >= 1000) return;
 
-		if (visitedNodes.count(succ->first) != 0 || succ->first == dst) continue;
+		if (visitedNodes.count(succ->first) != 0 && succ->first != dst) continue;
 
 
 		if (SCCID == -1 || SCCID == getSCCID(succ->first)) {
 
-			//Prunning
+			//Pruning
 			if (!acyclicPathExists(succ->first, dst, visitedNodes, SCCID)) continue;
 
 
@@ -1367,15 +1389,15 @@ bool Graph::acyclicPathExists(GraphNode* src,
 	                    succs.end(); succ != s_end; succ++) {
 
 
-	    	if (!visitedNodes.count(succ->first) && !worklist.count(succ->first)) {
+	    	if (visitedNodes.count(succ->first) && succ->first != dst) continue;
+	    	if (worklist.count(succ->first)) continue;
 
 
-	    		if(SCCID == -1 || SCCID == getSCCID(succ->first)){
+			if(SCCID == -1 || SCCID == getSCCID(succ->first)){
 
-	    			//Only insert in the worklist items that have not been visited yet
-					worklist.insert(succ->first);
+				//Only insert in the worklist items that have not been visited yet
+				worklist.insert(succ->first);
 
-				}
 			}
 	    }
 	}

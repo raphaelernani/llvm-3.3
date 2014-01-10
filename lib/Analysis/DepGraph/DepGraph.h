@@ -5,7 +5,7 @@
 #define DEBUG_TYPE "depgraph"
 #endif
 
-#define USE_ALIAS_SETS false
+#define USE_ALIAS_SETS true
 
 #include "llvm/Pass.h"
 #include "llvm/PassAnalysisSupport.h"
@@ -388,6 +388,10 @@ public:
 
         void dfsVisit(GraphNode* u, std::set<GraphNode*> &visitedNodes); //Used by findConnectingSubgraph() method
         void dfsVisitBack(GraphNode* u, std::set<GraphNode*> &visitedNodes); //Used by findConnectingSubgraph() method
+
+        void dfsVisitBack_ext(GraphNode* u, std::set<GraphNode*> &visitedNodes, std::map<int, GraphNode*> &firstNodeVisitedPerSCC);
+
+
 
         void deleteCallNodes(Function* F);
 
