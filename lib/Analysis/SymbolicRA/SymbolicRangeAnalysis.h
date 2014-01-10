@@ -175,6 +175,9 @@ public:
   bool isWidened()  const { return Widened_; }
   void setWidened()       { Widened_ = true; }
 
+  bool isNarrowed()  const { return Narrowed_; }
+  void setNarrowed()       { Narrowed_ = true; }
+
   void pushIncoming(/* BasicBlock *IncomingBlock, */ Junction *Incoming);
 
   Range getMeet();
@@ -187,10 +190,8 @@ public:
   virtual Range eval();
 
 private:
-  // void pushBlock(BasicBlock *IncomingBlock);
-
   bool Widened_;
-  // vector<BasicBlock*> IncomingBlocks_;
+  bool Narrowed_;
 };
 
 /******************
@@ -308,14 +309,7 @@ public:
 class SymbolicRangeAnalysis : public ModulePass {
 public:
   static char ID;
-  SymbolicRangeAnalysis() : ModulePass(ID) {
-	  F_ = NULL;
-	  BB_ = NULL;
-	  I_ = NULL;
-
-	  DT_ = NULL;
-	  DF_ = NULL;
-  }
+  SymbolicRangeAnalysis() : ModulePass(ID) { }
 
   typedef DenseMap<Value*, Junction*> JunctionsMapTy;
 

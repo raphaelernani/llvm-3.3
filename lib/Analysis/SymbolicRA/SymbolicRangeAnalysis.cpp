@@ -382,17 +382,11 @@ Range SigmaJunction::eval() {
  * PhiJunction *
  ***************/
 PhiJunction::PhiJunction(Value *V)
-  : Junction(V), Widened_(false) {
+  : Junction(V), Widened_(false), Narrowed_(false) {
 }
-
-// pushBlock
-/* void PhiJunction::pushBlock(BasicBlock *IncomingBlock) {
-  IncomingBlocks_.push_back(IncomingBlock);
-} */
 
 // pushIncoming
 void PhiJunction::pushIncoming(/* BasicBlock *IncomingBlock, */ Junction *Incoming) {
-  // pushBlock(IncomingBlock);
   pushArg(Incoming);
 }
 
@@ -410,16 +404,14 @@ Range PhiJunction::eval() {
   unsigned Idx = EvalIdx_++;
   RG_DEBUG_EVAL(dbgs() << "eval(): " << *this << ", " << Idx << "\n");
 
-  if (isWidened()) {
+  if (isNarrowed()) {
     RG_DEBUG_EVAL(dbgs() << "        isWidened()\n");
     return getRange();
   }
 
-  bool ShouldStop   = getIterations() >= 2;
-  bool ShouldWiden  = getIterations() == 0;
-
-  RG_DEBUG_EVAL(dbgs() << "        ShouldStop, ShouldWiden: " << ShouldStop
-                  << ", " << ShouldWiden << "\n");
+  bool ShouldStop   = getIterations() >= 3;
+  bool ShouldWiden  = getIterations() == 1;
+  bool ShouldNarrow = getIterations() == 0;
 
   // If we've already gone through all iterations, use the available
   // junction ranges instead of evaluating them again.
@@ -431,6 +423,10 @@ Range PhiJunction::eval() {
   if (ShouldWiden) {
     R = R.widen(getRange());
     setWidened();
+  } else if (ShouldNarrow) {
+    ArgsTy Args = getArgs();
+    R = GetEvalMeet(Args);
+    setNarrowed();
   } else {
     if (R.getLower() == Expr::GetBottomValue()) {
       ASSERT_EQ(R.getUpper(), Expr::GetBottomValue(),

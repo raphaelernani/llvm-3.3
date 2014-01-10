@@ -8,8 +8,8 @@
 #include "LoopControllersDepGraph.h"
 
 void LoopControllersDepGraph::getAnalysisUsage(AnalysisUsage &AU) const{
-	AU.addRequired<LoopInfo> ();
 	AU.addRequired<functionDepGraph> ();
+	AU.addRequired<LoopInfo> ();
     AU.setPreservesAll();
 }
 
