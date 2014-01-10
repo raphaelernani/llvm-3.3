@@ -9,7 +9,7 @@
 #define LOOPSTRUCTURE_H_
 
 #include "llvm/Pass.h"
-
+#include "DepGraph.h"
 #include "LoopControllersDepGraph.h"
 #include <set>
 #include <stack>
