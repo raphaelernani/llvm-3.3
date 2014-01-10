@@ -1,6 +1,6 @@
 #include <list>
-#include <tr1/unordered_set>
-#include <tr1/unordered_map>
+#include <set>
+#include <map>
 #include <queue>
 #include <stack>
 #include <sstream>
@@ -172,9 +172,9 @@ void PointerAnalysis::cycleSearch(int source, int target) {
 
 	// Tracking vars
 	bool cycleFound = false;
-	std::tr1::unordered_map<int,int> origin;
+	std::map<int,int> origin;
 	//IntMap origin;
-	std::tr1::unordered_set<int> visited;
+	std::set<int> visited;
 	//IntSet visited;
 	std::list<int> cycle;
 	std::stack<int> queue;
