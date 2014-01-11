@@ -64,15 +64,10 @@ public:
 	}
 
 	Loop* operator *() {
-
-		errs() << "deref ";
-
 		if (innerLoops.size()) {
-			errs() << "child ";
 			std::pair<Loop::iterator, Loop::iterator> tmp = innerLoops.top();
 			return *(tmp.first);
 		} else {
-			errs() << "parent ";
 			if (isEnd) assert(false && "Dereferencing out-of-bounds iterator!");
 			return *topLevelLoops;
 		}
@@ -90,8 +85,6 @@ public:
 	}
 
 	void operator++(int Useless){
-		errs() << "Step ";
-
 		if (innerLoops.size()) {
 
 			std::pair<Loop::iterator, Loop::iterator> tmp = innerLoops.top();
@@ -105,7 +98,6 @@ public:
 				innerLoops.push(tmp2);
 			}
 
-			errs() << "Child ";
 		} else {
 			topLevelLoops++;
 
