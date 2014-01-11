@@ -174,23 +174,6 @@ bool LoopStructure::runOnFunction(Function& F) {
 	}
 
 
-	for ( Function::iterator bbit = F.begin(); bbit != F.end(); bbit++) {
-
-		BasicBlock* BB = bbit;
-
-		Loop* L = li.getLoopFor(BB);
-
-		if(L){
-
-			if (L->getHeader() == BB)
-				errs() << "Header: " << BB->getName() << "\n";
-
-		}
-
-
-	}
-
-
 	//We don't make changes to the source code; return False
 	return false;
 }
