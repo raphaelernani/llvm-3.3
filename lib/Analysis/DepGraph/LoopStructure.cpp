@@ -79,7 +79,7 @@ bool LoopStructure::runOnFunction(Function& F) {
 
 		errs() << L->getLoopDepth() << "\n";
 
-		if (L->getLoopDepth() > 0) NumNestedLoops++;
+		if (L->getLoopDepth() > 1) NumNestedLoops++;
 
 		SmallVector<BasicBlock*, 4> exitingBlocks;
 		L->getExitingBlocks(exitingBlocks);
