@@ -8,7 +8,7 @@
 #ifndef TripCountAnalysis_H_
 #define TripCountAnalysis_H_
 
-#include "llvm/Analysis/LoopPass.h"
+#include "LoopInfoEx.h"
 #include "LoopControllersDepGraph.h"
 #include "LoopNormalizerAnalysis.h"
 #include "llvm/Pass.h"
@@ -32,7 +32,7 @@ namespace llvm {
 		~TripCountAnalysis(){};
 
 		virtual void getAnalysisUsage(AnalysisUsage &AU) const{
-			AU.addRequired<LoopInfo>();
+			AU.addRequired<LoopInfoEx>();
 			AU.addRequired<LoopNormalizerAnalysis>();
 			AU.setPreservesAll();
 		}

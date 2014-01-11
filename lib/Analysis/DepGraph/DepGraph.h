@@ -21,7 +21,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Analysis/LoopInfo.h"
+#include "LoopInfoEx.h"
 #include "AliasSets.h"
 #include <list>
 #include <map>

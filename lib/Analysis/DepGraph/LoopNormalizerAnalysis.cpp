@@ -26,9 +26,9 @@ bool llvm::LoopNormalizerAnalysis::doInitialization(Module& M) {
  */
 bool llvm::LoopNormalizerAnalysis::runOnFunction(Function& F) {
 
-	LoopInfo& li = getAnalysis<LoopInfo>();
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
 
-	for (LoopInfo::iterator it = li.begin(); it!= li.end(); it++){
+	for (LoopInfoEx::iterator it = li.begin(); it!= li.end(); it++){
 
 		Loop* loop = *it;
 

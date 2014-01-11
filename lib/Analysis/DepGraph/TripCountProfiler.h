@@ -8,6 +8,7 @@
 #ifndef TripCountProfiler_H_
 #define TripCountProfiler_H_
 
+#include "LoopInfoEx.h"
 #include "ExitInfo.h"
 #include "LoopControllersDepGraph.h"
 #include "LoopNormalizerAnalysis.h"
@@ -44,7 +45,7 @@ namespace llvm {
 
 			AU.addRequired<ExitInfo>();
 
-			AU.addRequired<LoopInfo>();
+			AU.addRequired<LoopInfoEx>();
 
 			AU.addRequired<LoopControllersDepGraph>();
 			AU.addRequired<LoopNormalizerAnalysis>();

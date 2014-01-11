@@ -286,7 +286,7 @@ Value* TripCountProfiler::generateEstimatedTripCount(BasicBlock* header, BasicBl
 
 Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHeader){
 
-	LoopInfo& li = getAnalysis<LoopInfo>();
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
 	LoopNormalizerAnalysis& ln = getAnalysis<LoopNormalizerAnalysis>();
 
 	Loop* loop = li.getLoopFor(loopHeader);
@@ -393,7 +393,7 @@ bool TripCountProfiler::runOnFunction(Function &F){
 	}
 
 
-	LoopInfo& li = getAnalysis<LoopInfo>();
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
 
 
 	/*
@@ -429,7 +429,7 @@ bool TripCountProfiler::runOnFunction(Function &F){
 	Constant* unknownTripCount = ConstantInt::get(Type::getInt64Ty(F.getContext()), -2);
 
 
-	for(LoopInfo::iterator lit = li.begin(); lit != li.end(); lit++){
+	for(LoopInfoEx::iterator lit = li.begin(); lit != li.end(); lit++){
 
 		//Indicates if we don't have ways to determine the trip count
 		bool unknownTC = false;

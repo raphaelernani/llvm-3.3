@@ -11,7 +11,7 @@
 
 #include "llvm/Pass.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Analysis/LoopInfo.h"
+#include "LoopInfoEx.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
@@ -27,7 +27,7 @@ namespace llvm {
 		virtual ~LoopNormalizer() {};
 
 		virtual void getAnalysisUsage(AnalysisUsage &AU) const{
-			AU.addRequired<LoopInfo>();
+			AU.addRequired<LoopInfoEx>();
 		}
 
 		virtual bool doInitialization(Module &M);

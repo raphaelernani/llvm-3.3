@@ -140,7 +140,7 @@ Value* TripCountGenerator::generatePericlesEstimatedTripCount(BasicBlock* header
 
 Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopHeader){
 
-	LoopInfo& li = getAnalysis<LoopInfo>();
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
 	LoopNormalizerAnalysis& ln = getAnalysis<LoopNormalizerAnalysis>();
 
 	Loop* loop = li.getLoopFor(loopHeader);
@@ -233,10 +233,10 @@ bool TripCountGenerator::runOnFunction(Function &F){
 
 	IRBuilder<> Builder(F.getEntryBlock().getTerminator());
 
-	LoopInfo& li = getAnalysis<LoopInfo>();
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
 	LoopNormalizerAnalysis& ln = getAnalysis<LoopNormalizerAnalysis>();
 
-	for(LoopInfo::iterator lit = li.begin(); lit != li.end(); lit++){
+	for(LoopInfoEx::iterator lit = li.begin(); lit != li.end(); lit++){
 
 		//Indicates if we don't have ways to determine the trip count
 		bool unknownTC = false;

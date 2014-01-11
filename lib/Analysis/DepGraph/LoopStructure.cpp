@@ -67,15 +67,19 @@ bool LoopStructure::runOnFunction(Function& F) {
 	Graph* graph = lcd.depGraph;
 	graph->recomputeSCCs();
 
-	LoopInfo & li = getAnalysis<LoopInfo>();
-	for (LoopInfo::iterator it = li.begin(); it != li.end();  it++) {
+	LoopInfoEx & li = getAnalysis<LoopInfoEx>();
+	for (LoopInfoEx::iterator it = li.begin(); it != li.end();  it++) {
 
 		// Section 1: Structure of the loops in the CFG
 		NumLoops++;
 
 		Loop* L = *it;
 
-		if (L->getLoopDepth() > 1) NumNestedLoops++;
+		errs() << " " << L << " ";
+
+		errs() << L->getLoopDepth() << "\n";
+
+		if (L->getLoopDepth() > 0) NumNestedLoops++;
 
 		SmallVector<BasicBlock*, 4> exitingBlocks;
 		L->getExitingBlocks(exitingBlocks);
@@ -98,7 +102,6 @@ bool LoopStructure::runOnFunction(Function& F) {
 			} else if (SwitchInst* SI = dyn_cast<SwitchInst>(T)){
 				Condition = SI->getCondition();
 			} else {
-				errs() << "Unknown instruction " << *T << "\n";
 				NumUnhandledExits++;
 			}
 
@@ -171,6 +174,23 @@ bool LoopStructure::runOnFunction(Function& F) {
 			}
 
 		}
+
+	}
+
+
+	for ( Function::iterator bbit = F.begin(); bbit != F.end(); bbit++) {
+
+		BasicBlock* BB = bbit;
+
+		Loop* L = li.getLoopFor(BB);
+
+		if(L){
+
+			if (L->getHeader() == BB)
+				errs() << "Header: " << BB->getName() << "\n";
+
+		}
+
 
 	}
 

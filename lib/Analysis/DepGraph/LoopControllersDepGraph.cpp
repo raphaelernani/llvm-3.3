@@ -9,7 +9,7 @@
 
 void LoopControllersDepGraph::getAnalysisUsage(AnalysisUsage &AU) const{
 	AU.addRequired<functionDepGraph> ();
-	AU.addRequired<LoopInfo> ();
+	AU.addRequired<LoopInfoEx> ();
     AU.setPreservesAll();
 }
 
@@ -20,10 +20,10 @@ bool LoopControllersDepGraph::runOnFunction(Function& F){
     depGraph = DepGraph.depGraph;
 
     //Step 2: Get the list of values that control the loop exit
-    LoopInfo& li = getAnalysis<LoopInfo>();
+    LoopInfoEx& li = getAnalysis<LoopInfoEx>();
     std::set<Value*> loopExitPredicates;
 
-    for (LoopInfo::iterator lit = li.begin(), lend = li.end(); lit != lend; lit++) {
+    for (LoopInfoEx::iterator lit = li.begin(), lend = li.end(); lit != lend; lit++) {
 
     	Loop* l = *lit;
 
@@ -83,7 +83,7 @@ static RegisterPass<ViewLoopControllersDepGraphSCCs> X("ViewLoopControllersDepGr
 
 
 void ModuleLoopControllersDepGraph::getAnalysisUsage(AnalysisUsage &AU) const{
-	AU.addRequired<LoopInfo>();
+	AU.addRequired<LoopInfoEx>();
 	AU.addRequired<moduleDepGraph> ();
     AU.setPreservesAll();
 }
@@ -98,10 +98,10 @@ bool ModuleLoopControllersDepGraph::runOnModule(Module& M){
     std::set<Value*> loopExitPredicates;
     for (Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; Fit++) {
 
-		LoopInfo& li = getAnalysis<LoopInfo>(*Fit);
+    	LoopInfoEx& li = getAnalysis<LoopInfoEx>(*Fit);
 		std::set<Value*> loopExitPredicates;
 
-		for (LoopInfo::iterator lit = li.begin(), lend = li.end(); lit != lend; lit++) {
+		for (LoopInfoEx::iterator lit = li.begin(), lend = li.end(); lit != lend; lit++) {
 
 			Loop* l = *lit;
 

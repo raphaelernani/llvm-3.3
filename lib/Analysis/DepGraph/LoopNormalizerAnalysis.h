@@ -10,7 +10,7 @@
 
 #include "llvm/Pass.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Analysis/LoopInfo.h"
+#include "LoopInfoEx.h"
 
 namespace llvm {
 
@@ -22,7 +22,7 @@ namespace llvm {
 		virtual ~LoopNormalizerAnalysis() {};
 
 		virtual void getAnalysisUsage(AnalysisUsage &AU) const{
-			AU.addRequiredTransitive<LoopInfo>();
+			AU.addRequiredTransitive<LoopInfoEx>();
 			AU.setPreservesAll();
 		}
 

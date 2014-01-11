@@ -20,9 +20,9 @@ bool TripCountAnalysis::runOnFunction(Function& F){
 
 
 	LoopNormalizerAnalysis& lna = getAnalysis<LoopNormalizerAnalysis>();
-	LoopInfo& li = getAnalysis<LoopInfo>();
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
 
-	for (LoopInfo::iterator it = li.begin(); it!= li.end(); it++){
+	for (LoopInfoEx::iterator it = li.begin(); it!= li.end(); it++){
 
 		Loop* loop = *it;
 

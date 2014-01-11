@@ -8,6 +8,7 @@
 #ifndef TripCountGenerator_H_
 #define TripCountGenerator_H_
 
+#include "LoopInfoEx.h"
 #include "ExitInfo.h"
 #include "LoopControllersDepGraph.h"
 #include "LoopNormalizerAnalysis.h"
@@ -35,7 +36,7 @@ namespace llvm {
 
 		virtual void getAnalysisUsage(AnalysisUsage &AU) const{
 
-			AU.addRequired<LoopInfo>();
+			AU.addRequired<LoopInfoEx>();
 
 			AU.addRequired<LoopControllersDepGraph>();
 			AU.addRequired<LoopNormalizerAnalysis>();

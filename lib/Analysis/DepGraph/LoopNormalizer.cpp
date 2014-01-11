@@ -154,10 +154,10 @@ bool llvm::LoopNormalizer::doInitialization(Module& M) {
  */
 bool llvm::LoopNormalizer::runOnFunction(Function& F) {
 
-	LoopInfo& li = getAnalysis<LoopInfo>();
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
 
 	//Normalize headers
-	for (LoopInfo::iterator it = li.begin(); it!= li.end(); it++){
+	for (LoopInfoEx::iterator it = li.begin(); it!= li.end(); it++){
 
 		Loop* loop = *it;
 

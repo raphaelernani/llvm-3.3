@@ -10,6 +10,7 @@
 
 #include "llvm/Pass.h"
 #include "DepGraph.h"
+#include "LoopInfoEx.h"
 #include "LoopControllersDepGraph.h"
 #include <set>
 #include <stack>
@@ -27,7 +28,7 @@ namespace llvm {
 
 		virtual void getAnalysisUsage(AnalysisUsage &AU) const{
 			AU.addRequired<LoopControllersDepGraph>();
-			AU.addRequired<LoopInfo>();
+			AU.addRequiredTransitive<LoopInfoEx>();
 			AU.setPreservesAll();
 		}
 
