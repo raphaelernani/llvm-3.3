@@ -59,7 +59,7 @@ namespace llvm {
 		bool runOnFunction(Function &F);
 
 		Value* generateEstimatedTripCount(BasicBlock* header, BasicBlock* entryBlock, Value* Op1, Value* Op2, CmpInst* CI);
-		void saveTripCount(std::set<BasicBlock*> BB, AllocaInst* tripCountPtr, Value* estimatedTripCount,  BasicBlock* loopHeader);
+		void saveTripCount(std::set<BasicBlock*> BB, AllocaInst* tripCountPtr, Value* estimatedTripCount,  BasicBlock* loopHeader, int LoopClass);
 
 		Value* getValueAtEntryPoint(Value* source, BasicBlock* loopHeader);
 

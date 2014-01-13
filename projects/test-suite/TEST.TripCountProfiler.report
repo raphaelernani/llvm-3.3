@@ -76,12 +76,26 @@ $HilightColumns{9} = 1;
 # Name
  ["Program"  , '\'([^\']+)\' Program'],
  [],
-# Times
- ["TripCount Accuracy" , 'TripCount Accuracy\s*([.0-9]+)'],
+# Instrumentation
+ ["NumInstrumentedLoops"    , '([0-9]+).*Number of Instrumented Loops'],
+ ["NumIntervalLoops"        , '([0-9]+).*Number of Interval Loops'],
+ ["NumEqualityLoops"        , '([0-9]+).*Number of Equality Loops'], 
+ ["NumOtherLoops"           , '([0-9]+).*Number of Other Loops'],
  [],
- ["NAT"      , 'TEST-RESULT-nat-time: user\s*([.0-9m:]+)', \&FormatTime],
- ["LLC"      , 'TEST-RESULT-llc-time: user\s*([.0-9m:]+)', \&FormatTime],
- ["INST" , 'TEST-RESULT-instr-time: user\s*([.0-9m:]+)',\&FormatTime],
+ ["NumUnknownConditionsIL"  , '([0-9]+).*Number of Interval Loops With Unknown TripCount'],
+ ["NumUnknownConditionsEL"  , '([0-9]+).*Number of Equality Loops With Unknown TripCount'], 
+ ["NumUnknownConditionsOL"  , '([0-9]+).*Number of Other Loops With Unknown TripCount'],
+ [], 
+# Accuracy
+ ["TC Accuracy - IL"        , 'TripCount Accuracy \(Interval Loops\)\s*([.0-9]+)'],
+ ["TC Accuracy - EL"        , 'TripCount Accuracy \(Equality Loops\)\s*([.0-9]+)'],
+ ["TC Accuracy - OL"        , 'TripCount Accuracy \(Other Loops\)\s*([.0-9]+)'], 
+ ["TC Accuracy - All"       , 'TripCount Accuracy \(All Loops\)\s*([.0-9]+)'],
+ [],
+# Times
+ ["NAT"                     , 'TEST-RESULT-nat-time: user\s*([.0-9m:]+)', \&FormatTime],
+ ["LLC"                     , 'TEST-RESULT-llc-time: user\s*([.0-9m:]+)', \&FormatTime],
+ ["INST"                    , 'TEST-RESULT-instr-time: user\s*([.0-9m:]+)',\&FormatTime],
  [],
  ["INST/LLC"  , \&INSTLLCRatio],
  ["INST/NAT"  , \&INSTNATRatio],

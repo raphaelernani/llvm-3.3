@@ -16,16 +16,18 @@ typedef struct _loopStats {
 	struct _loopStats *next;
 
 	int64_t ID;
+	int LoopClass;
 	int numInstances;
 	double predictionAccuracy;
 
 } LoopStats;
 
-LoopStats* createLoopStats(int64_t new_ID){
+LoopStats* createLoopStats(int64_t new_ID, int LoopClass){
 
 	LoopStats* result = (LoopStats*)malloc(sizeof(LoopStats));
 
 	result->ID = new_ID;
+	result->LoopClass = LoopClass;
 	result->numInstances = 0;
 	result->predictionAccuracy = 1.0;
 	result->next = NULL;
@@ -69,7 +71,7 @@ void freeList(LoopList *L){
 	L->First = NULL;
 }
 
-LoopStats* getOrInsertLoop(LoopList *L, int64_t ID){
+LoopStats* getOrInsertLoop(LoopList *L, int64_t ID, int LoopClass){
 
 	//Get
 	LoopStats* currentNode = L->First;
@@ -84,7 +86,7 @@ LoopStats* getOrInsertLoop(LoopList *L, int64_t ID){
 	if (currentNode != NULL) return currentNode;
 
 	//Not found; insert
-	LoopStats* newNode = createLoopStats(ID);
+	LoopStats* newNode = createLoopStats(ID, LoopClass);
 	if (lastNode != NULL) {
 		lastNode->next = newNode;
 	} else {
@@ -100,8 +102,8 @@ void initLoopList(){
 	loops.First = NULL;
 }
 
-void collectLoopData(int64_t LoopHeaderBBPointer, int64_t tripCount, int64_t estimatedTripCount){
-	addInstance(getOrInsertLoop(&loops, LoopHeaderBBPointer), tripCount, estimatedTripCount);
+void collectLoopData(int64_t LoopHeaderBBPointer, int64_t tripCount, int64_t estimatedTripCount, int LoopClass){
+	addInstance(getOrInsertLoop(&loops, LoopHeaderBBPointer, LoopClass), tripCount, estimatedTripCount);
 }
 
 void flushLoopStats(char* moduleIdentifier){
@@ -117,7 +119,11 @@ void flushLoopStats(char* moduleIdentifier){
 
 		while (currentNode != NULL){
 
-			fprintf(outStream, "TripCount %s.%" PRId64 " %f\n", moduleIdentifier, currentNode->ID, currentNode->predictionAccuracy );
+			fprintf(outStream, "TripCount %d %s.%" PRId64 " %f\n",
+						currentNode->LoopClass,
+						moduleIdentifier,
+						currentNode->ID,
+						currentNode->predictionAccuracy );
 
 			currentNode = currentNode->next;
 		}

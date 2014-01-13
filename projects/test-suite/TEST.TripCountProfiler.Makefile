@@ -28,10 +28,17 @@ Output/%.linked.rbc.instr.bc: Output/%.linked.rbc $(LOPT)
 else
 $(PROGRAMS_TO_TEST:%=Output/%.linked.rbc.instr.bc):  \
 Output/%.linked.rbc.instr.bc: Output/%.linked.rbc $(LOPT)
-	@-$(LOPT) -mem2reg -break-crit-edges -instnamer -stats -time-passes	-load DepGraph.so -loop-normalizer -tc-profiler $< -o $<.tmp
+	@-$(LOPT) -mem2reg -break-crit-edges -instnamer -stats -time-passes \
+		-load DepGraph.so -loop-normalizer -tc-profiler $< -o $<.tmp \
+		2>Output/$*.instrumentation.stats
 	clang -S -emit-llvm $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.c -o $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc
 	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.linked.rbc.instr.bc.info llvm-link $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc $<.tmp -o=$@
 endif
+
+#Output of the Instrumentation step
+$(PROGRAMS_TO_TEST:%=Output/%.instrumentation.stats): \
+Output/%.instrumentation.stats: Output/%.linked.rbc.instr.bc
+	@
 
 # Generate a .o file from the llvm.bc file with the integrated assembler.
 $(PROGRAMS_TO_TEST:%=Output/%.llc-instr.o): \
@@ -111,7 +118,7 @@ Output/%.exe-llc-instr: Output/%.diff-llc-instr
 
 # Instrumented tests
 $(PROGRAMS_TO_TEST:%=Output/%.nightly.instr.report.txt): \
-Output/%.nightly.instr.report.txt: Output/%.exe-llc-instr Output/%.out-llc-instr-loops Output/%.loops.out
+Output/%.nightly.instr.report.txt: Output/%.exe-llc-instr Output/%.out-llc-instr-loops Output/%.loops.out Output/%.instrumentation.stats
 	@echo > $@
 	@-if test -f Output/$*.exe-llc-instr; then \
 	  head -n 100 Output/$*.exe-llc-instr >> $@; \
@@ -122,6 +129,8 @@ Output/%.nightly.instr.report.txt: Output/%.exe-llc-instr Output/%.out-llc-instr
 	  grep "^user" Output/$*.out-llc-instr.time >> $@;\
 	  echo >> $@;\
 	  cat Output/$*.out-llc-instr-loops >> $@;\
+	  echo >> $@;\
+	  cat Output/$*.instrumentation.stats >> $@;\
 	else  \
 	  echo "TEST-FAIL: instr $(RELDIR)/$*" >> $@;\
 	fi

@@ -12,7 +12,14 @@
 #include "TripCountProfiler.h"
 
 STATISTIC(NumInstrumentedLoops, "Number of Instrumented Loops");
-STATISTIC(NumUnknownConditions, "Number of Unknown Loop Conditions");
+
+STATISTIC(NumIntervalLoops, "Number of Interval Loops");
+STATISTIC(NumEqualityLoops, "Number of Equality Loops");
+STATISTIC(NumOtherLoops,    "Number of Other Loops");
+
+STATISTIC(NumUnknownConditionsIL, "Number of Interval Loops With Unknown TripCount");
+STATISTIC(NumUnknownConditionsEL, "Number of Equality Loops With Unknown TripCount");
+STATISTIC(NumUnknownConditionsOL, "Number of Other Loops With Unknown TripCount");
 
 using namespace llvm;
 
@@ -33,7 +40,7 @@ Value* insertAdd(BasicBlock *BB, AllocaInst *A) {
   return I;
 }
 
-void llvm::TripCountProfiler::saveTripCount(std::set<BasicBlock*> BBs, AllocaInst* tripCountPtr, Value* estimatedTripCount,  BasicBlock* loopHeader){
+void llvm::TripCountProfiler::saveTripCount(std::set<BasicBlock*> BBs, AllocaInst* tripCountPtr, Value* estimatedTripCount,  BasicBlock* loopHeader, int LoopClass){
 
 
 	for(std::set<BasicBlock*>::iterator it = BBs.begin(), end = BBs.end(); it != end; it++){
@@ -43,14 +50,17 @@ void llvm::TripCountProfiler::saveTripCount(std::set<BasicBlock*> BBs, AllocaIns
 		IRBuilder<> Builder(BB->getFirstInsertionPt());
 
 		ConstantInt* loopIdentifier = ConstantInt::get(Type::getInt64Ty(*context), (int64_t)loopHeader);
+		ConstantInt* loopClass = ConstantInt::get(Type::getInt32Ty(*context), (int64_t)LoopClass);
 
-		Value* stderr = Builder.CreateAlignedLoad(GVstderr, 4);
+
+		//Value* stderr = Builder.CreateAlignedLoad(GVstderr, 4);
 		Value* tripCount = Builder.CreateAlignedLoad(tripCountPtr, 4);
 
 		std::vector<Value*> args;
 		args.push_back(loopIdentifier);
 		args.push_back(tripCount);
 		args.push_back(estimatedTripCount);
+		args.push_back(loopClass);
 		llvm::ArrayRef<llvm::Value *> arrayArgs(args);
 		Builder.CreateCall(collectLoopData, arrayArgs, "");
 
@@ -153,7 +163,13 @@ bool llvm::TripCountProfiler::doInitialization(Module& M) {
 	context = &M.getContext();
 
 	NumInstrumentedLoops = 0;
-	NumUnknownConditions = 0;
+	NumIntervalLoops = 0;
+	NumEqualityLoops = 0;
+	NumOtherLoops = 0;
+
+	NumUnknownConditionsIL = 0;
+	NumUnknownConditionsEL = 0;
+	NumUnknownConditionsOL = 0;
 
 
 	/*
@@ -169,9 +185,10 @@ bool llvm::TripCountProfiler::doInitialization(Module& M) {
 	initLoopList = M.getOrInsertFunction("initLoopList", T);
 
 	std::vector<Type*> args;
-	args.push_back(Type::getInt64Ty(*context));
-	args.push_back(Type::getInt64Ty(*context));
-	args.push_back(Type::getInt64Ty(*context));
+	args.push_back(Type::getInt64Ty(*context));   // Loop Identifier
+	args.push_back(Type::getInt64Ty(*context));   // Actual TripCount
+	args.push_back(Type::getInt64Ty(*context));   // Estimated TripCount
+	args.push_back(Type::getInt32Ty(*context));   // LoopClass (0=Interval; 1=Equality; 2=Other)
 	llvm::ArrayRef<Type*> arrayArgs(args);
 	FunctionType *T1 = FunctionType::get(Ty, arrayArgs, true);
 	collectLoopData = M.getOrInsertFunction("collectLoopData", T1);
@@ -464,14 +481,43 @@ bool TripCountProfiler::runOnFunction(Function &F){
 		Value* Op1 = NULL;
 		Value* Op2 = NULL;
 
-		if (!CI) unknownTC = true;
+		int LoopClass;
+
+		if (!CI) {
+
+			unknownTC = true;
+			NumOtherLoops++;
+			NumUnknownConditionsOL++;
+
+			LoopClass = 2;
+		}
 		else {
+
+			switch(CI->getPredicate()){
+			case ICmpInst::ICMP_SGE:
+			case ICmpInst::ICMP_SGT:
+			case ICmpInst::ICMP_UGE:
+			case ICmpInst::ICMP_UGT:
+			case ICmpInst::ICMP_SLE:
+			case ICmpInst::ICMP_SLT:
+			case ICmpInst::ICMP_ULE:
+			case ICmpInst::ICMP_ULT:
+				LoopClass = 0;
+				NumIntervalLoops++;
+				break;
+			default:
+				LoopClass = 1;
+				NumEqualityLoops++;
+			}
+
+
 			Op1 = getValueAtEntryPoint(CI->getOperand(0), header);
 			Op2 = getValueAtEntryPoint(CI->getOperand(1), header);
 
 
 			if((!Op1) || (!Op2) ) {
-				NumUnknownConditions++;
+				if (!LoopClass) NumUnknownConditionsIL++;
+				else 			NumUnknownConditionsEL++;
 				unknownTC = true;
 			}
 		}
@@ -483,7 +529,8 @@ bool TripCountProfiler::runOnFunction(Function &F){
 		}else {
 			if (Op1->getType() != Op2->getType()) {
 				//We know both operands, but they have different types.
-				NumUnknownConditions++;
+				if (!LoopClass) NumUnknownConditionsIL++;
+				else 			NumUnknownConditionsEL++;
 				estimatedTripCount = unknownTripCount;
 			} else {
 				estimatedTripCount = generateEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
@@ -516,7 +563,7 @@ bool TripCountProfiler::runOnFunction(Function &F){
 
 		}
 
-		saveTripCount(blocksToInstrument, tripCount, estimatedTripCount, header);
+		saveTripCount(blocksToInstrument, tripCount, estimatedTripCount, header, LoopClass);
 
 		NumInstrumentedLoops++;
 
