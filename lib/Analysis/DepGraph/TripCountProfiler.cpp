@@ -547,19 +547,23 @@ bool TripCountProfiler::runOnFunction(Function &F){
 		insertAdd(header, tripCount);
 
 
+		/*
+		 * We will collect the actual trip count and the estimate trip count in every
+		 * basic block that is outside the loop
+		 */
 		std::set<BasicBlock*> blocksToInstrument;
-		for(succ_iterator s = succ_begin(exitBlock); s != succ_end(exitBlock); s++){
+		SmallVector<BasicBlock*, 2> exitBlocks;
+		loop->getExitBlocks(exitBlocks);
+		for (SmallVectorImpl<BasicBlock*>::iterator eb = exitBlocks.begin(); eb !=  exitBlocks.end(); eb++){
 
-			//Collecting the blocks that are executed immediately after the loop stops
-			if (li.getLoopDepth(*s) < li.getLoopDepth(exitBlock)) {
+			BasicBlock* CurrentEB = *eb;
 
-				/*
-				 * Does not instrument landingPad (exception handling) blocks
-				 * TODO: Handle LandingPad blocks (if possible)
-				 */
-				if(!(*s)->isLandingPad())
-					blocksToInstrument.insert(*s);
-			}
+			/*
+			 * Does not instrument landingPad (exception handling) blocks
+			 * TODO: Handle LandingPad blocks (if possible)
+			 */
+			if(!CurrentEB->isLandingPad())
+				blocksToInstrument.insert(CurrentEB);
 
 		}
 
