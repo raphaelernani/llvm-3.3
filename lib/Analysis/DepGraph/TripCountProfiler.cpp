@@ -564,16 +564,6 @@ bool TripCountProfiler::runOnFunction(Function &F){
 				if (!LoopClass) NumUnknownConditionsIL++;
 				else 			NumUnknownConditionsEL++;
 
-				if (exitBlock == header) {
-
-					errs() << "\n Unknown Operand\n";
-					errs() << "EntryBlock:" << *entryBlock << "\n";
-					errs() << "LoopHeader:" << *header << "\n";
-
-
-				}
-
-
 				unknownTC = true;
 			} else if((!Op1->getType()->isIntegerTy()) || (!Op2->getType()->isIntegerTy())) {
 				NumIncompatibleOperandTypes++;
