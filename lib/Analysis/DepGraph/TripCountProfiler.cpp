@@ -21,6 +21,8 @@ STATISTIC(NumUnknownConditionsIL, "Number of Interval Loops With Unknown TripCou
 STATISTIC(NumUnknownConditionsEL, "Number of Equality Loops With Unknown TripCount");
 STATISTIC(NumUnknownConditionsOL, "Number of Other Loops With Unknown TripCount");
 
+STATISTIC(NumIncompatibleOperandTypes, "Number of Loop Conditions With Incompatible Operands");
+
 
 using namespace llvm;
 
@@ -220,6 +222,10 @@ Value* TripCountProfiler::generateEstimatedTripCount(BasicBlock* header, BasicBl
 
 	//Make sure the two operands have the same type
 	if (Op1->getType() != Op2->getType()) {
+
+		errs() << "\nDifferent Types\n";
+		errs() << "Op1: " << *Op1 << "\n";
+		errs() << "Op2: " << *Op2 << "\n";
 
 		if (Op1->getType()->getIntegerBitWidth() > Op2->getType()->getIntegerBitWidth() ) {
 			//expand op2
@@ -554,6 +560,9 @@ bool TripCountProfiler::runOnFunction(Function &F){
 			if((!Op1) || (!Op2) ) {
 				if (!LoopClass) NumUnknownConditionsIL++;
 				else 			NumUnknownConditionsEL++;
+				unknownTC = true;
+			} else if((!Op1->getType()->isIntegerTy()) || (!Op2->getType()->isIntegerTy())) {
+				NumIncompatibleOperandTypes++;
 				unknownTC = true;
 			}
 		}
