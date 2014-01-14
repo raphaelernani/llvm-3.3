@@ -369,7 +369,15 @@ Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHe
 	}
 
 	//Option 3: Sequence of loads/stores in the same memory location. Create load in the entry block and return the loaded value
-	//TODO: Implement this option
+	if (LoadInst* LI = dyn_cast<LoadInst>(source)){
+		Value* pointer = getValueAtEntryPoint(LI->getPointerOperand(), loopHeader);
+		if (pointer){
+			IRBuilder<> Builder(ln.entryBlocks[loopHeader]->getTerminator());
+
+			Value* EntryLoad = Builder.CreateLoad(pointer,"");
+			return EntryLoad;
+		}
+	}
 
 	//Option 4: unknown. Return NULL
 	return NULL;
