@@ -223,10 +223,6 @@ Value* TripCountProfiler::generateEstimatedTripCount(BasicBlock* header, BasicBl
 	//Make sure the two operands have the same type
 	if (Op1->getType() != Op2->getType()) {
 
-		errs() << "\nDifferent Types\n";
-		errs() << "Op1: " << *Op1 << "\n";
-		errs() << "Op2: " << *Op2 << "\n";
-
 		if (Op1->getType()->getIntegerBitWidth() > Op2->getType()->getIntegerBitWidth() ) {
 			//expand op2
 			if (isSigned) Op2 = Builder.CreateSExt(Op2, Op1->getType(), "");
@@ -238,7 +234,6 @@ Value* TripCountProfiler::generateEstimatedTripCount(BasicBlock* header, BasicBl
 			else Op1 = Builder.CreateZExt(Op1, Op2->getType(), "");
 
 		}
-
 
 	}
 
@@ -560,6 +555,17 @@ bool TripCountProfiler::runOnFunction(Function &F){
 			if((!Op1) || (!Op2) ) {
 				if (!LoopClass) NumUnknownConditionsIL++;
 				else 			NumUnknownConditionsEL++;
+
+				if (exitBlock == header) {
+
+					errs() << "\n Unknown Operand\n";
+					errs() << "EntryBlock:" << *entryBlock << "\n";
+					errs() << "LoopHeader:" << *header << "\n";
+
+
+				}
+
+
 				unknownTC = true;
 			} else if((!Op1->getType()->isIntegerTy()) || (!Op2->getType()->isIntegerTy())) {
 				NumIncompatibleOperandTypes++;
