@@ -21,6 +21,7 @@ STATISTIC(NumUnknownConditionsIL, "Number of Interval Loops With Unknown TripCou
 STATISTIC(NumUnknownConditionsEL, "Number of Equality Loops With Unknown TripCount");
 STATISTIC(NumUnknownConditionsOL, "Number of Other Loops With Unknown TripCount");
 
+
 using namespace llvm;
 
 
@@ -206,6 +207,7 @@ Value* TripCountProfiler::generateEstimatedTripCount(BasicBlock* header, BasicBl
 
 	bool isSigned = CI->isSigned();
 
+
 	BasicBlock* GT = BasicBlock::Create(*context, "", header->getParent(), header);
 	BasicBlock* LE = BasicBlock::Create(*context, "", header->getParent(), header);
 	BasicBlock* PHI = BasicBlock::Create(*context, "", header->getParent(), header);
@@ -216,7 +218,27 @@ Value* TripCountProfiler::generateEstimatedTripCount(BasicBlock* header, BasicBl
 
 	Value* cmp;
 
-	if (Op1->getType() != Op2->getType()) errs() << "Deu Merda!\n";
+	//Make sure the two operands have the same type
+	if (Op1->getType() != Op2->getType()) {
+
+		if (Op1->getType()->getIntegerBitWidth() > Op2->getType()->getIntegerBitWidth() ) {
+			//expand op2
+			if (isSigned) Op2 = Builder.CreateSExt(Op2, Op1->getType(), "");
+			else Op2 = Builder.CreateZExt(Op2, Op1->getType(), "");
+
+		} else {
+			//expand op1
+			if (isSigned) Op1 = Builder.CreateSExt(Op1, Op2->getType(), "");
+			else Op1 = Builder.CreateZExt(Op1, Op2->getType(), "");
+
+		}
+
+
+	}
+
+	assert(Op1->getType() == Op2->getType() && "Operands with different data types, even after adjust!");
+
+	Builder.SetInsertPoint(T);
 
 	if (isSigned)
 		cmp = Builder.CreateICmpSGT(Op1,Op2,"");
@@ -299,6 +321,20 @@ Value* TripCountProfiler::generateEstimatedTripCount(BasicBlock* header, BasicBl
 
 
 	return EstimatedTripCount;
+}
+
+Instruction* getNextInstruction(Instruction* I){
+
+	Instruction* result = NULL;
+
+	if(!isa<TerminatorInst>(I)){
+		BasicBlock::iterator it(I);
+		it++;
+		result = it;
+	}
+
+	return result;
+
 }
 
 Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHeader){
@@ -392,9 +428,9 @@ BasicBlock* TripCountProfiler::findLoopControllerBlock(Loop* l){
 bool TripCountProfiler::runOnFunction(Function &F){
 
 	IRBuilder<> Builder(F.getEntryBlock().getTerminator());
-	if (!formatStr){
-		formatStr = Builder.CreateGlobalStringPtr("TripCount " + F.getParent()->getModuleIdentifier() + ".%" PRId64 ": %" PRId64 " %d\n",    "formatStr");
-	}
+//	if (!formatStr){
+//		formatStr = Builder.CreateGlobalStringPtr("TripCount " + F.getParent()->getModuleIdentifier() + ".%" PRId64 ": %" PRId64 " %d\n",    "formatStr");
+//	}
 
 	if (!moduleIdentifierStr){
 		moduleIdentifierStr = Builder.CreateGlobalStringPtr(F.getParent()->getModuleIdentifier(), "moduleIdentifierStr");
@@ -527,15 +563,7 @@ bool TripCountProfiler::runOnFunction(Function &F){
 		if(unknownTC){
 			estimatedTripCount = unknownTripCount;
 		}else {
-			if (Op1->getType() != Op2->getType()) {
-				//We know both operands, but they have different types.
-				if (!LoopClass) NumUnknownConditionsIL++;
-				else 			NumUnknownConditionsEL++;
-				estimatedTripCount = unknownTripCount;
-			} else {
-				estimatedTripCount = generateEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
-			}
-
+			estimatedTripCount = generateEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
 		}
 
 
