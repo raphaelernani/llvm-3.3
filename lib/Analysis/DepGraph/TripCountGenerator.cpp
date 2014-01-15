@@ -201,15 +201,11 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 		}
 	}
 
+	Instruction *InstToCopy = NULL;
+
 	//Option 3: Sequence of loads/stores in the same memory location. Create load in the entry block and return the loaded value
 	if (LoadInst* LI = dyn_cast<LoadInst>(source)){
-		Value* pointer = getValueAtEntryPoint(LI->getPointerOperand(), loopHeader);
-		if (pointer){
-			IRBuilder<> Builder(ln.entryBlocks[loopHeader]->getTerminator());
-
-			Value* EntryLoad = Builder.CreateLoad(pointer,"");
-			return EntryLoad;
-		}
+		InstToCopy = LI;
 	}
 
 
@@ -220,30 +216,35 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 
 	//Option 5: GetElementPTR - Create a similar getElementPtr in the entry block
 	if (GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(source)){
+		InstToCopy = GEPI;
+	}
+
+
+	if (InstToCopy) {
 
 		unsigned int prev_size = ln.entryBlocks[loopHeader]->getInstList().size();
 
-		Instruction* NEW_GEPI = GEPI->clone();
-		ln.entryBlocks[loopHeader]->getInstList().push_front(NEW_GEPI);
+		Instruction* NEW_INST = InstToCopy->clone();
+		ln.entryBlocks[loopHeader]->getInstList().push_front(NEW_INST);
 
-		for(unsigned int i = 0; i < GEPI->getNumOperands(); i++){
+		for(unsigned int i = 0; i < InstToCopy->getNumOperands(); i++){
 
-			Value* op = getValueAtEntryPoint(GEPI->getOperand(i), loopHeader);
+			Value* op = getValueAtEntryPoint(InstToCopy->getOperand(i), loopHeader);
 
 			if (!op) {
 
 				//Undo changes in the entry block
-				while (ln.entryBlocks[loopHeader]->getInstList().size() != prev_size) {
+				while (ln.entryBlocks[loopHeader]->getInstList().size() > prev_size) {
 					ln.entryBlocks[loopHeader]->getInstList().pop_front();
 				}
 
 				return NULL;
 			}
 
-			NEW_GEPI->setOperand(i, op);
+			NEW_INST->setOperand(i, op);
 		}
 
-		return NEW_GEPI;
+		return NEW_INST;
 	}
 
 	//Option 9999: unknown. Return NULL
