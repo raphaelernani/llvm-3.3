@@ -395,7 +395,18 @@ Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHe
 
 	//Option 5: GetElementPTR - Create a similar getElementPtr in the entry block
 	if (GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(source)){
-		InstToCopy = GEPI;
+
+		// Do the copy only if all the operands are loop-invariant
+		bool isInvariant = true;
+
+		for(unsigned int i = 0; i < GEPI->getNumOperands(); i++){
+			if (!loop->isLoopInvariant(GEPI->getOperand(i))) {
+				isInvariant = false;
+				break;
+			}
+		}
+
+		if (isInvariant) InstToCopy = GEPI;
 	}
 
 
