@@ -400,15 +400,31 @@ Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHe
 	//Option 5: GetElementPTR - Create a similar getElementPtr in the entry block
 	if (GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(source)){
 
-		//Only if the pointer is the same, or else we would break something
-		if (loop->isLoopInvariant(GEPI->getPointerOperand())){
+		unsigned int prev_size = ln.entryBlocks[loopHeader]->getInstList().size();
 
-			Instruction* NEW_GEPI = GEPI->clone();
-			ln.entryBlocks[loopHeader]->getInstList().push_front(NEW_GEPI);
+		Instruction* NEW_GEPI = GEPI->clone();
+		ln.entryBlocks[loopHeader]->getInstList().push_front(NEW_GEPI);
 
-			return NEW_GEPI;
+		for(unsigned int i = 0; i < GEPI->getNumOperands(); i++){
+
+			Value* op = getValueAtEntryPoint(GEPI->getOperand(i), loopHeader);
+
+			if (!op) {
+
+				//Undo changes in the entry block
+				while (ln.entryBlocks[loopHeader]->getInstList().size() != prev_size) {
+					ln.entryBlocks[loopHeader]->getInstList().pop_front();
+				}
+
+				return NULL;
+			}
+
+			NEW_GEPI->setOperand(i, op);
 		}
+
+		return NEW_GEPI;
 	}
+
 
 	//Option 9999: unknown. Return NULL
 	return NULL;

@@ -51,6 +51,27 @@ Value* TripCountGenerator::generatePericlesEstimatedTripCount(BasicBlock* header
 
 	IRBuilder<> Builder(T);
 
+
+	//Make sure the two operands have the same type
+	if (Op1->getType() != Op2->getType()) {
+
+		if (Op1->getType()->getIntegerBitWidth() > Op2->getType()->getIntegerBitWidth() ) {
+			//expand op2
+			if (isSigned) Op2 = Builder.CreateSExt(Op2, Op1->getType(), "");
+			else Op2 = Builder.CreateZExt(Op2, Op1->getType(), "");
+
+		} else {
+			//expand op1
+			if (isSigned) Op1 = Builder.CreateSExt(Op1, Op2->getType(), "");
+			else Op1 = Builder.CreateZExt(Op1, Op2->getType(), "");
+
+		}
+
+	}
+
+	assert(Op1->getType() == Op2->getType() && "Operands with different data types, even after adjust!");
+
+
 	Value* cmp;
 
 	if (isSigned)
@@ -151,27 +172,81 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 	//Option 2: Sequence of redefinitions with PHI node in the loop header. Return the incoming value from the entry block
 	LoopControllersDepGraph& lcd = getAnalysis<LoopControllersDepGraph>();
 	GraphNode* node = lcd.depGraph->findNode(source);
-	if (!node) return NULL;
+	if (!node) {
+		return NULL;
+	}
 
 	int SCCID = lcd.depGraph->getSCCID(node);
 	Graph sccGraph = lcd.depGraph->generateSubGraph(SCCID);
+
 	for(Graph::iterator it =  sccGraph.begin(); it != sccGraph.end(); it++){
+
+		Value* V = NULL;
+
 		if (VarNode* VN = dyn_cast<VarNode>(*it)) {
-			Value* V = VN->getValue();
-			if (PHINode* PHI = dyn_cast<PHINode>(V))
+			V = VN->getValue();
+		} else	if (OpNode* ON = dyn_cast<OpNode>(*it)) {
+			V = ON->getValue();
+		}
+
+		if (V) {
+			if (PHINode* PHI = dyn_cast<PHINode>(V)) {
 				if(PHI->getParent() == loopHeader ) {
 
 					Value* IncomingFromEntry = PHI->getIncomingValueForBlock(ln.entryBlocks[loopHeader]);
 					return IncomingFromEntry;
 
 				}
+			}
 		}
 	}
 
 	//Option 3: Sequence of loads/stores in the same memory location. Create load in the entry block and return the loaded value
-	//TODO: Implement this option
+	if (LoadInst* LI = dyn_cast<LoadInst>(source)){
+		Value* pointer = getValueAtEntryPoint(LI->getPointerOperand(), loopHeader);
+		if (pointer){
+			IRBuilder<> Builder(ln.entryBlocks[loopHeader]->getTerminator());
 
-	//Option 4: unknown. Return NULL
+			Value* EntryLoad = Builder.CreateLoad(pointer,"");
+			return EntryLoad;
+		}
+	}
+
+
+	//Option 4: Cast Instruction (Bitcast, Zext, SExt, Trunc etc...): Propagate search (The value theoretically is the same)
+	if (CastInst* CI = dyn_cast<CastInst>(source)){
+		return getValueAtEntryPoint(CI->getOperand(0), loopHeader);
+	}
+
+	//Option 5: GetElementPTR - Create a similar getElementPtr in the entry block
+	if (GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(source)){
+
+		unsigned int prev_size = ln.entryBlocks[loopHeader]->getInstList().size();
+
+		Instruction* NEW_GEPI = GEPI->clone();
+		ln.entryBlocks[loopHeader]->getInstList().push_front(NEW_GEPI);
+
+		for(unsigned int i = 0; i < GEPI->getNumOperands(); i++){
+
+			Value* op = getValueAtEntryPoint(GEPI->getOperand(i), loopHeader);
+
+			if (!op) {
+
+				//Undo changes in the entry block
+				while (ln.entryBlocks[loopHeader]->getInstList().size() != prev_size) {
+					ln.entryBlocks[loopHeader]->getInstList().pop_front();
+				}
+
+				return NULL;
+			}
+
+			NEW_GEPI->setOperand(i, op);
+		}
+
+		return NEW_GEPI;
+	}
+
+	//Option 9999: unknown. Return NULL
 	return NULL;
 }
 
@@ -292,15 +367,7 @@ bool TripCountGenerator::runOnFunction(Function &F){
 					 */
 					NumNonIntegerConditions++;
 					unknownTC = true;
-				} else if (Op1->getType() != Op2->getType()) {
-
-					/*
-					 * FIXME: Try to put both operators in the same type
-					 */
-					NumUnknownConditions++;
-					unknownTC = true;
 				}
-
 
 			}
 
@@ -312,12 +379,6 @@ bool TripCountGenerator::runOnFunction(Function &F){
 
 		if(!unknownTC) {
 
-			printdebug(
-
-					errs() << "Op1: " << *Op1 << "\n";
-					errs() << "Op2: " << *Op2 << "\n\n";
-
-				);
 
 			generatePericlesEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
 		}
