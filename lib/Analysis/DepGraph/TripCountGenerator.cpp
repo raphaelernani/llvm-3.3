@@ -216,10 +216,24 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 
 	//Option 5: GetElementPTR - Create a similar getElementPtr in the entry block
 	if (GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(source)){
-		InstToCopy = GEPI;
+
+		// Do the copy only if all the operands are loop-invariant
+		bool isInvariant = true;
+
+		for(unsigned int i = 0; i < GEPI->getNumOperands(); i++){
+			if (!loop->isLoopInvariant(GEPI->getOperand(i))) {
+				isInvariant = false;
+				break;
+			}
+		}
+
+		if (isInvariant) InstToCopy = GEPI;
 	}
 
 
+
+	//Here we try to copy the instruction in the entry block
+	//we adjust the operands  to the value dominate all of its uses.
 	if (InstToCopy) {
 
 		unsigned int prev_size = ln.entryBlocks[loopHeader]->getInstList().size();
