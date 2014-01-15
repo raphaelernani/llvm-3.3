@@ -351,20 +351,32 @@ Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHe
 	//Option 2: Sequence of redefinitions with PHI node in the loop header. Return the incoming value from the entry block
 	LoopControllersDepGraph& lcd = getAnalysis<LoopControllersDepGraph>();
 	GraphNode* node = lcd.depGraph->findNode(source);
-	if (!node) return NULL;
+	if (!node) {
+		return NULL;
+	}
 
 	int SCCID = lcd.depGraph->getSCCID(node);
 	Graph sccGraph = lcd.depGraph->generateSubGraph(SCCID);
+
 	for(Graph::iterator it =  sccGraph.begin(); it != sccGraph.end(); it++){
+
+		Value* V = NULL;
+
 		if (VarNode* VN = dyn_cast<VarNode>(*it)) {
-			Value* V = VN->getValue();
-			if (PHINode* PHI = dyn_cast<PHINode>(V))
+			V = VN->getValue();
+		} else	if (OpNode* ON = dyn_cast<OpNode>(*it)) {
+			V = ON->getValue();
+		}
+
+		if (V) {
+			if (PHINode* PHI = dyn_cast<PHINode>(V)) {
 				if(PHI->getParent() == loopHeader ) {
 
 					Value* IncomingFromEntry = PHI->getIncomingValueForBlock(ln.entryBlocks[loopHeader]);
 					return IncomingFromEntry;
 
 				}
+			}
 		}
 	}
 
@@ -379,7 +391,26 @@ Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHe
 		}
 	}
 
-	//Option 4: unknown. Return NULL
+
+	//Option 4: Cast Instruction (Bitcast, Zext, SExt, Trunc etc...): Propagate search (The value theoretically is the same)
+	if (CastInst* CI = dyn_cast<CastInst>(source)){
+		return getValueAtEntryPoint(CI->getOperand(0), loopHeader);
+	}
+
+	//Option 5: GetElementPTR - Create a similar getElementPtr in the entry block
+	if (GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(source)){
+
+		//Only if the pointer is the same, or else we would break something
+		if (loop->isLoopInvariant(GEPI->getPointerOperand())){
+
+			Instruction* NEW_GEPI = GEPI->clone();
+			ln.entryBlocks[loopHeader]->getInstList().push_front(NEW_GEPI);
+
+			return NEW_GEPI;
+		}
+	}
+
+	//Option 9999: unknown. Return NULL
 	return NULL;
 }
 
@@ -400,10 +431,6 @@ BasicBlock* TripCountProfiler::findLoopControllerBlock(Loop* l){
 
 	SmallVector<BasicBlock*, 2>  exitBlocks;
 	l->getExitingBlocks(exitBlocks);
-
-	if (!exitBlocks.size()) {
-		errs() << "Empty!\n";
-	}
 
 	//Case 1: for/while (the header is an exiting block)
 	for (SmallVectorImpl<BasicBlock*>::iterator It = exitBlocks.begin(), Iend = exitBlocks.end(); It != Iend; It++){
@@ -561,6 +588,21 @@ bool TripCountProfiler::runOnFunction(Function &F){
 
 
 			if((!Op1) || (!Op2) ) {
+
+//				errs() << "\n\n=======================UNKNOWN BEGIN==============================\n";
+//				errs() << "Op1:" << *CI->getOperand(0) << "\n";
+//				if (Op1) errs() << "Op1_Entry: " << *Op1 << "\n";
+//				else errs() << "Op1_Entry: NULL\n";
+//				errs() << "\n";
+//
+//				errs() << "Op2:" << *CI->getOperand(1) << "\n";
+//				if (Op2) errs() << "Op2_Entry: " << *Op2 << "\n";
+//				else errs() << "Op2_Entry: NULL\n";
+//				errs() << "\n";
+//
+//				errs() << *header << "\n";
+//				errs() << "===============================END================================\n\n\n";
+
 				if (!LoopClass) NumUnknownConditionsIL++;
 				else 			NumUnknownConditionsEL++;
 
