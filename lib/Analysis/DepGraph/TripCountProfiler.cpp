@@ -424,6 +424,10 @@ Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHe
 
 			Value* op = getValueAtEntryPoint(InstToCopy->getOperand(i), loopHeader);
 
+			if (op){
+				if (op->getType() != InstToCopy->getOperand(i)->getType()) op = NULL;
+			}
+
 			if (!op) {
 
 				//Undo changes in the entry block

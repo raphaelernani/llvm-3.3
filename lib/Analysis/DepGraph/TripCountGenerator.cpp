@@ -245,11 +245,15 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 
 			Value* op = getValueAtEntryPoint(InstToCopy->getOperand(i), loopHeader);
 
+			if (op){
+				if (op->getType() != InstToCopy->getOperand(i)->getType()) op = NULL;
+			}
+
 			if (!op) {
 
 				//Undo changes in the entry block
 				while (ln.entryBlocks[loopHeader]->getInstList().size() > prev_size) {
-					ln.entryBlocks[loopHeader]->getInstList().pop_front();
+					ln.entryBlocks[loopHeader]->begin()->eraseFromParent();
 				}
 
 				return NULL;
