@@ -323,6 +323,9 @@ private:
 		//Graph analysis - Strongly connected components
 		std::map<int, std::set<GraphNode*> > sCCs;
 		std::map<GraphNode*, int> reverseSCCMap;
+		std::list<int> topologicalOrderedSCCs;
+
+
 
 		AliasSets *AS;
 

@@ -11,5 +11,10 @@ LEVEL = ../../..
 LIBRARYNAME = DepGraph
 LOADABLE_MODULE = 1
 USEDLIBS = 
+REQUIRES_RTTI=1
 
 include $(LEVEL)/Makefile.common
+
+CXXFLAGS+= -std=c++0x -Wno-deprecated-declarations -fexceptions -w
+LIBS+= -lginac
+LDFLAGS+=-fPIC -shared -L/usr/local/lib -Wl,-rpath,/usr/local/lib:

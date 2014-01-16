@@ -1614,7 +1614,7 @@ void llvm::Graph::Guider::setNodeAttrs(GraphNode* n, std::string attrs) {
 
 void llvm::Graph::Guider::setEdgeAttrs(GraphNode* u, GraphNode* v,
                 std::string attrs) {
-        edgeAttrs[std::make_pair<GraphNode*, GraphNode*>(u, v)] = attrs;
+        edgeAttrs[std::pair<GraphNode*, GraphNode*>(u, v)] = attrs;
 }
 
 void llvm::Graph::Guider::clear() {
@@ -1627,7 +1627,7 @@ std::string llvm::Graph::Guider::getNodeAttrs(GraphNode* n) {
 }
 
 std::string llvm::Graph::Guider::getEdgeAttrs(GraphNode* u, GraphNode* v) {
-        return edgeAttrs[std::make_pair<GraphNode*, GraphNode*>(u, v)];
+        return edgeAttrs[std::pair<GraphNode*, GraphNode*>(u, v)];
 }
 
 char moduleDepGraph::ID = 0;
