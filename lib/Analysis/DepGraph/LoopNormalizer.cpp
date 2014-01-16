@@ -56,12 +56,14 @@ BasicBlock* LoopNormalizer::normalizePreHeaders(std::set<BasicBlock*> PreHeaders
 	BasicBlock* EntryBlock = BasicBlock::Create(Header->getParent()->getContext(), "Entry", Header->getParent(), Header);
 
 	//Unconditional branch from the entry block to the loop header
-	BranchInst::Create(Header,EntryBlock);
+	BranchInst* br = BranchInst::Create(Header,EntryBlock);
 
 	//Disconnect the PreHeaders from the Header and Connect them to the Entry Block
 	for(std::set<BasicBlock*>::iterator it = PreHeaders.begin(), iend = PreHeaders.end(); it != iend; it++){
 		switchBranch(*it, Header, EntryBlock);
 	}
+
+	bool hasPHI = false;
 
 	//Now the PHIs are a mess. Here we set them accordingly
 	for(BasicBlock::iterator it = Header->begin(); it != Header->end(); it++){
@@ -83,6 +85,8 @@ BasicBlock* LoopNormalizer::normalizePreHeaders(std::set<BasicBlock*> PreHeaders
 			else if (numIncomingValues > 1) {
 				PHINode* newPHI = PHINode::Create(PHI->getType(), numIncomingValues, "", EntryBlock->getTerminator());
 
+				hasPHI = true;
+
 				for (std::set<unsigned int>::iterator i = OutsideIncomingValues.begin(); i != OutsideIncomingValues.end(); i++){
 					newPHI->addIncoming( PHI->getIncomingValue(*i), PHI->getIncomingBlock(*i) );
 				}
@@ -97,6 +101,10 @@ BasicBlock* LoopNormalizer::normalizePreHeaders(std::set<BasicBlock*> PreHeaders
 
 		}
 		else break;
+	}
+
+	if (hasPHI) {
+		EntryBlock = EntryBlock->splitBasicBlock(br, "");
 	}
 
 	return EntryBlock;
