@@ -47,7 +47,11 @@ namespace llvm {
 
 		bool runOnFunction(Function &F);
 
+		void generatePericlesEstimatedTripCounts(Function &F);
 		Value* generatePericlesEstimatedTripCount(BasicBlock* header, BasicBlock* entryBlock, Value* Op1, Value* Op2, CmpInst* CI);
+
+		void generateVectorEstimatedTripCounts(Function &F);
+
 
 		Value* getValueAtEntryPoint(Value* source, BasicBlock* loopHeader);
 

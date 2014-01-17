@@ -322,6 +322,21 @@ std::list<GenericGraphNode<T>*> GenericGraph<T>::getNodesWithoutPredecessors() {
 }
 
 template <typename T>
+GenericGraphNode<T>* GenericGraph<T>::getFirstNodeWithoutPredecessors(){
+
+    for (typename std::set<GenericGraphNode<T>* >::iterator node = nodes.begin(), end = nodes.end(); node != end; node++) {
+
+             std::map<GenericGraphNode<T>*, int> preds = (*node)->getPredecessors();
+
+             if (preds.size() == 0) return *node;
+
+     }
+
+	return NULL;
+
+}
+
+template <typename T>
 void GenericGraph<T>::removeEdge(GenericGraphNode<T>* src, GenericGraphNode<T>* dst) {
 
 	src->disconnect(dst);

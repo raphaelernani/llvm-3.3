@@ -55,6 +55,8 @@ public:
         std::string getName();
         virtual std::string getShape();
         virtual std::string getStyle();
+
+        inline T operator*(){ return element; };
 };
 
 
@@ -104,6 +106,9 @@ public:
         void dfsVisitBack(GenericGraphNode<T>* u, std::set<GenericGraphNode<T>*> &visitedNodes); //Used by findConnectingSubgraph() method
 
         std::list<GenericGraphNode<T>*> getNodesWithoutPredecessors();
+        GenericGraphNode<T>* getFirstNodeWithoutPredecessors();
+
+        inline int getNumNodes() { return nodes.size();};
 
 };
 

@@ -11,6 +11,10 @@
 
 #include "TripCountGenerator.h"
 
+static cl::opt<bool, false>
+usePericlesTripCount("usePericlesTripCount", cl::desc("Use Pericles's heuristic to estimate trip count."), cl::NotHidden);
+
+
 STATISTIC(NumInstrumentedLoops, 	"Number of Instrumented Loops");
 STATISTIC(NumUnknownConditions, 	"Number of Unknown Loop Conditions");
 STATISTIC(NumNonIntegerConditions, 	"Number of Non-Integer Loop Conditions");
@@ -320,10 +324,8 @@ BasicBlock* TripCountGenerator::findLoopControllerBlock(Loop* l){
 }
 
 
-bool TripCountGenerator::runOnFunction(Function &F){
 
-
-
+void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 
 	IRBuilder<> Builder(F.getEntryBlock().getTerminator());
 
@@ -390,20 +392,28 @@ bool TripCountGenerator::runOnFunction(Function &F){
 
 			}
 
-
-
 		}
 
-
-
 		if(!unknownTC) {
-
-
 			generatePericlesEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
 		}
 
 		NumInstrumentedLoops++;
 	}
+
+}
+
+
+void TripCountGenerator::generateVectorEstimatedTripCounts(Function &F){
+
+}
+
+bool TripCountGenerator::runOnFunction(Function &F){
+
+	if (usePericlesTripCount)
+		generatePericlesEstimatedTripCounts(F);
+	else
+		generateVectorEstimatedTripCounts(F);
 
 	return true;
 }
