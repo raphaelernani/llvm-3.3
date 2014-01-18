@@ -10,6 +10,7 @@
 
 #include "LoopInfoEx.h"
 #include "ExitInfo.h"
+#include "ProgressVector.h"
 #include "LoopControllersDepGraph.h"
 #include "LoopNormalizerAnalysis.h"
 #include "llvm/Pass.h"
@@ -54,6 +55,9 @@ namespace llvm {
 
 
 		Value* getValueAtEntryPoint(Value* source, BasicBlock* loopHeader);
+
+		ProgressVector* generateConstantProgressVector(Value* source, BasicBlock* loopHeader);
+
 
 		BasicBlock* findLoopControllerBlock(Loop* l);
 

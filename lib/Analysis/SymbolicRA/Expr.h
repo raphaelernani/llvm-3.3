@@ -32,6 +32,7 @@ public:
   Expr(GiNaC::ex Expr);
   Expr(Twine Name);
   Expr(const Value *V);
+  Expr(const Value* V, int level);
 
   Expr subs(vector<pair<Expr, Expr> > Subs); 
 

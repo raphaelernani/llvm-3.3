@@ -273,6 +273,86 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 	return NULL;
 }
 
+template <typename T>
+std::stack<T> invertStack(std::stack<T> input){
+
+	std::stack<T> result;
+
+	while (input.size() > 0) {
+		result.push(input.top());
+		input.pop();
+	}
+
+	return result;
+}
+
+
+ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source, BasicBlock* loopHeader){
+
+
+	LoopControllersDepGraph & lcd = getAnalysis<LoopControllersDepGraph>();
+	Graph* depGraph = lcd.depGraph;
+	depGraph->recomputeSCCs();
+
+	GraphNode* sourceNode = depGraph->findNode(source);
+
+	ProgressVector* result = NULL;
+
+
+	std::set<std::stack<GraphNode*> > paths = depGraph->getAcyclicPathsInsideSCC(sourceNode, sourceNode);
+
+	//We will not analyze values with more than 999 paths of redefinitions
+	if (paths.size() > 999) return result;
+
+	//We will now evaluate each of the paths and aggregate them according to the
+	//argument VectorAggregation
+	for (std::set<std::stack<GraphNode*> >::iterator pIt = paths.begin(); pIt != paths.end(); pIt++){
+
+		std::stack<GraphNode*> inversePath = *pIt;
+
+		if (inversePath.top() != sourceNode) inversePath.push(sourceNode);
+
+		//Here we extract the sequence of values in this path
+		std::set<Value*> uniqueValues;
+		std::list<Value*> path;
+
+		while (inversePath.size() > 0) {
+			Value* v = NULL;
+
+			if ( VarNode* VN = dyn_cast<VarNode>( inversePath.top() )  ) {
+				v = VN->getValue();
+			}
+
+			if ( OpNode* ON = dyn_cast<OpNode>( inversePath.top() )  ) {
+				v = ON->getValue();
+			}
+
+			if (v) {
+
+				if (!uniqueValues.count(v)) {
+					uniqueValues.insert(v);
+					path.push_front(v);
+				}
+
+			}
+
+			inversePath.pop();
+
+		}
+
+		ProgressVector* currentPathVector = new ProgressVector(path);
+
+
+
+
+	}
+
+
+
+
+
+	return result;
+}
 
 /*
  * Given a natural loop, find the basic block that is more likely block that
@@ -308,8 +388,7 @@ BasicBlock* TripCountGenerator::findLoopControllerBlock(Loop* l){
 
 		BasicBlock* BB = *It;
 
-		//Here we iterate over the successors of BB to check if it is a block that leads the control
-		//back to the header.
+		//Here we iterate over the successors of BB to check if the header is one of them
 		for(succ_iterator s = succ_begin(BB); s != succ_end(BB); s++){
 
 			if (*s == header) {
@@ -326,8 +405,6 @@ BasicBlock* TripCountGenerator::findLoopControllerBlock(Loop* l){
 
 
 void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
-
-	IRBuilder<> Builder(F.getEntryBlock().getTerminator());
 
 	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
 	LoopNormalizerAnalysis& ln = getAnalysis<LoopNormalizerAnalysis>();
@@ -349,18 +426,7 @@ void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 		 * integer comparisons.
 		 */
 		BasicBlock* exitBlock = findLoopControllerBlock(loop);
-
-		if (!exitBlock){
-
-			errs() << *header;
-
-			/*
-			 * FIXME: Theoretically, every loop must have at least one exit point.
-			 * Understand better the cases in which this is not true.
-			 */
-			ExitBlocksNotFound++;
-			continue;
-		}
+		assert(exitBlock && "ExitBlock not found!");
 
 		TerminatorInst* T = exitBlock->getTerminator();
 		BranchInst* BI = dyn_cast<BranchInst>(T);
@@ -405,6 +471,68 @@ void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 
 
 void TripCountGenerator::generateVectorEstimatedTripCounts(Function &F){
+
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
+	LoopNormalizerAnalysis& ln = getAnalysis<LoopNormalizerAnalysis>();
+
+	for(LoopInfoEx::iterator lit = li.begin(); lit != li.end(); lit++){
+
+		//Indicates if we don't have ways to determine the trip count
+		bool unknownTC = false;
+
+		Loop* loop = *lit;
+
+		BasicBlock* header = loop->getHeader();
+		BasicBlock* entryBlock = ln.entryBlocks[header];
+
+		/*
+		 * Here we are looking for the predicate that stops the loop.
+		 *
+		 * At this moment, we are only considering loops that are controlled by
+		 * integer comparisons.
+		 */
+		BasicBlock* exitBlock = findLoopControllerBlock(loop);
+		assert(exitBlock && "Exiting Block not found!");
+
+		TerminatorInst* T = exitBlock->getTerminator();
+		BranchInst* BI = dyn_cast<BranchInst>(T);
+		ICmpInst* CI = BI ? dyn_cast<ICmpInst>(BI->getCondition()) : NULL;
+
+		Value* Op1 = NULL;
+		Value* Op2 = NULL;
+
+		if (!CI) unknownTC = true;
+		else {
+			//Get the value of the operands before the first iteration
+			Op1 = getValueAtEntryPoint(CI->getOperand(0), header);
+			Op2 = getValueAtEntryPoint(CI->getOperand(1), header);
+
+			//Check if the values are OK
+			if((!Op1) || (!Op2) ) {
+				NumUnknownConditions++;
+				unknownTC = true;
+			} else {
+				//We only handle loop conditions that compares integer variables
+				if (!(Op1->getType()->isIntegerTy() && Op2->getType()->isIntegerTy())) {
+					NumNonIntegerConditions++;
+					unknownTC = true;
+				}
+			}
+
+		}
+
+		if (!unknownTC) {
+			ProgressVector* V1 = generateConstantProgressVector(CI->getOperand(0), header);
+			ProgressVector* V2 = generateConstantProgressVector(CI->getOperand(1), header);
+		}
+
+
+		if(!unknownTC) {
+			generatePericlesEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
+		}
+
+		NumInstrumentedLoops++;
+	}
 
 }
 

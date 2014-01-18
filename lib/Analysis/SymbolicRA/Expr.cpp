@@ -239,8 +239,16 @@ Expr::Expr(Twine Name)
   : Expr_(GiNaC::symbol(Name.str())) {
 }
 
-static DenseMap<const Value*, GiNaC::ex> Exprs;
-Expr::Expr(const Value *V) {
+static DenseMap<std::pair<const Value*, int>, GiNaC::ex> Exprs;
+Expr::Expr(const Value *V) : Expr(V,0) {}
+
+Expr::Expr(const Value *V, int level) {
+
+	//Level 0: stop recursion
+	//Level 1: recursion just one time
+	//Level 2: unlimited recursion
+
+
   assert(V && "Constructor expected non-null parameter");
   
   if (const ConstantInt *CI = dyn_cast<ConstantInt>(V)) {
@@ -248,24 +256,90 @@ Expr::Expr(const Value *V) {
     return;
   }
 
-  if (Exprs.count(V)) {
-    Expr_ = Exprs[V];
+  if (Exprs.count(std::pair<const Value*, int>(V,level))) {
+    Expr_ = Exprs[std::pair<const Value*, int>(V,level)];
     return;
   }
 
-  Twine Name;
-  if (V->hasName()) {
-    if (isa<const Instruction>(V) || isa<const Argument>(V))
-      Name = V->getName();
-    else
-      Name = "__SRA_SYM_UNKNOWN_" + V->getName() + "__";
-  } else {
-    Name = "__SRA_SYM_UNAMED__";
+  //Level 0: stop recursion
+  if (level == 0) {
+	  Twine Name;
+	  if (V->hasName()) {
+		if (isa<const Instruction>(V) || isa<const Argument>(V))
+		  Name = V->getName();
+		else
+		  Name = "__SRA_SYM_UNKNOWN_" + V->getName() + "__";
+	  } else {
+		Name = "__SRA_SYM_UNAMED__";
+	  }
+
+	  std::string NameStr = Name.str();
+	  Expr_ = GiNaC::ex(GiNaC::symbol(NameStr));
+	  Exprs[std::pair<const Value*, int>(V,level)] = Expr_;
+
+	  return;
   }
 
-  std::string NameStr = Name.str();
-  Expr_ = GiNaC::ex(GiNaC::symbol(NameStr));
-  Exprs[V] = Expr_;
+  int old_level = level;
+  level = (level == 1 ? 0 : 2);
+
+
+  //Handle instructions
+
+  if (const BinaryOperator* BI = dyn_cast<llvm::BinaryOperator>(V)){
+
+	  switch (BI->getOpcode()){
+	  case Instruction::Add:
+	  {
+		  Expr ADD_Op1(BI->getOperand(0), level);
+		  Expr ADD_Op2(BI->getOperand(1), level);
+		  Expr_ = (ADD_Op1.getExpr() + ADD_Op2.getExpr());
+		  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+		  return;
+	  }
+	  case Instruction::Sub:
+	  {
+		  Expr SUB_Op1(BI->getOperand(0), level);
+		  Expr SUB_Op2(BI->getOperand(1), level);
+		  Expr_ = (SUB_Op1.getExpr() + SUB_Op2.getExpr());
+		  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+		  return;
+	  }
+	  case Instruction::Mul:
+	  {
+		  Expr MUL_Op1(BI->getOperand(0), level);
+		  Expr MUL_Op2(BI->getOperand(1), level);
+		  Expr_ = (MUL_Op1.getExpr() * MUL_Op2.getExpr());
+		  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+		  return;
+	  }
+	  case Instruction::SDiv:
+	  case Instruction::UDiv:
+	  {
+		  Expr DIV_Op1(BI->getOperand(0), level);
+		  Expr DIV_Op2(BI->getOperand(1), level);
+		  Expr_ = (DIV_Op1.getExpr() / DIV_Op2.getExpr());
+		  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+		  return;
+	  }
+	  default:
+		  break;
+	  }
+
+  }
+
+  if (const CastInst* CI = dyn_cast<CastInst>(V)){
+	  Expr CAST_Op(CI->getOperand(0), old_level);
+	  Expr_ = CAST_Op.getExpr();
+	  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+	  return;
+  }
+
+
+  //Unhandled instructions: treat them like level 0
+  Expr tmp(V,0);
+  Expr_ = tmp.getExpr();
+
 }
 
 Expr Expr::subs(std::vector<std::pair<Expr, Expr> > Subs) { 
