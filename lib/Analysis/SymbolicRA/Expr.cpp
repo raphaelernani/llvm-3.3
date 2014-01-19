@@ -239,10 +239,12 @@ Expr::Expr(Twine Name)
   : Expr_(GiNaC::symbol(Name.str())) {
 }
 
-static DenseMap<std::pair<const Value*, int>, GiNaC::ex> Exprs;
-Expr::Expr(const Value *V) : Expr(V,0) {}
+static DenseMap<std::pair<Value*, int>, GiNaC::ex> Exprs;
+static std::map<std::string, Value*> RevExprs;
 
-Expr::Expr(const Value *V, int level) {
+Expr::Expr(Value *V) : Expr(V,0) {}
+
+Expr::Expr(Value *V, int level) {
 
 	//Level 0: stop recursion
 	//Level 1: recursion just one time
@@ -256,8 +258,8 @@ Expr::Expr(const Value *V, int level) {
     return;
   }
 
-  if (Exprs.count(std::pair<const Value*, int>(V,level))) {
-    Expr_ = Exprs[std::pair<const Value*, int>(V,level)];
+  if (Exprs.count(std::pair<Value*, int>(V,level))) {
+    Expr_ = Exprs[std::pair<Value*, int>(V,level)];
     return;
   }
 
@@ -265,7 +267,7 @@ Expr::Expr(const Value *V, int level) {
   if (level == 0) {
 	  Twine Name;
 	  if (V->hasName()) {
-		if (isa<const Instruction>(V) || isa<const Argument>(V))
+		if (isa<Instruction>(V) || isa<Argument>(V))
 		  Name = V->getName();
 		else
 		  Name = "__SRA_SYM_UNKNOWN_" + V->getName() + "__";
@@ -275,7 +277,10 @@ Expr::Expr(const Value *V, int level) {
 
 	  std::string NameStr = Name.str();
 	  Expr_ = GiNaC::ex(GiNaC::symbol(NameStr));
-	  Exprs[std::pair<const Value*, int>(V,level)] = Expr_;
+	  Exprs[std::pair<Value*, int>(V,level)] = Expr_;
+
+	  RevExprs[NameStr] = V;
+	  errs() << "Expr: " << NameStr << "	Value: " << *V << " Size:" << RevExprs.size()  << "\n";
 
 	  return;
   }
@@ -294,7 +299,7 @@ Expr::Expr(const Value *V, int level) {
 		  Expr ADD_Op1(BI->getOperand(0), level);
 		  Expr ADD_Op2(BI->getOperand(1), level);
 		  Expr_ = (ADD_Op1.getExpr() + ADD_Op2.getExpr());
-		  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+		  Exprs[std::pair<Value*, int>(V,old_level)] = Expr_;
 		  return;
 	  }
 	  case Instruction::Sub:
@@ -302,7 +307,7 @@ Expr::Expr(const Value *V, int level) {
 		  Expr SUB_Op1(BI->getOperand(0), level);
 		  Expr SUB_Op2(BI->getOperand(1), level);
 		  Expr_ = (SUB_Op1.getExpr() + SUB_Op2.getExpr());
-		  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+		  Exprs[std::pair<Value*, int>(V,old_level)] = Expr_;
 		  return;
 	  }
 	  case Instruction::Mul:
@@ -310,7 +315,7 @@ Expr::Expr(const Value *V, int level) {
 		  Expr MUL_Op1(BI->getOperand(0), level);
 		  Expr MUL_Op2(BI->getOperand(1), level);
 		  Expr_ = (MUL_Op1.getExpr() * MUL_Op2.getExpr());
-		  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+		  Exprs[std::pair<Value*, int>(V,old_level)] = Expr_;
 		  return;
 	  }
 	  case Instruction::SDiv:
@@ -319,7 +324,7 @@ Expr::Expr(const Value *V, int level) {
 		  Expr DIV_Op1(BI->getOperand(0), level);
 		  Expr DIV_Op2(BI->getOperand(1), level);
 		  Expr_ = (DIV_Op1.getExpr() / DIV_Op2.getExpr());
-		  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+		  Exprs[std::pair<Value*, int>(V,old_level)] = Expr_;
 		  return;
 	  }
 	  default:
@@ -331,7 +336,7 @@ Expr::Expr(const Value *V, int level) {
   if (const CastInst* CI = dyn_cast<CastInst>(V)){
 	  Expr CAST_Op(CI->getOperand(0), old_level);
 	  Expr_ = CAST_Op.getExpr();
-	  Exprs[std::pair<const Value*, int>(V,old_level)] = Expr_;
+	  Exprs[std::pair<Value*, int>(V,old_level)] = Expr_;
 	  return;
   }
 
@@ -543,6 +548,29 @@ Expr Expr::GetZeroValue() {
 Expr Expr::GetBottomValue() {
   static Expr Bottom(GiNaC::symbol("BOTTOM"));
   return Bottom;
+}
+
+int Expr::getNumber() const {
+
+	assert(isNumber() && "Expression is not a number!");
+
+	return Expr_.integer_content().to_int();
+}
+
+Value* Expr::getUniqueValue() const {
+
+	//Unique operand
+	if (Expr_.nops() > 1) return NULL;
+
+	std::ostringstream Str;
+	Str << Expr_;
+
+	if (RevExprs.count(Str.str())) {
+		return RevExprs[Str.str()];
+	}
+
+	return NULL;
+
 }
 
 GiNaC::ex Expr::getExpr() const {

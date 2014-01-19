@@ -21,10 +21,16 @@ ProgressVector::ProgressVector(std::list<Value*> redefinition) {
 
 		Value* CurrentValue = *it;
 
+		errs() << "Value: " << *CurrentValue << "\n";
+
+
 		Expr CurrentExpr;
 
 		if (first) {
 			firstExpr = Expr(CurrentValue);
+
+			//errs() << "First Expr:" << firstExpr << "\n";
+
 			vecExpr = firstExpr;
 		} else {
 
@@ -33,7 +39,6 @@ ProgressVector::ProgressVector(std::list<Value*> redefinition) {
 				CurrentValue = PreviousValue;
 			}
 
-			Expr CurrentExprName;
 			CurrentExpr = Expr(CurrentValue, 1);
 
 			std::vector<std::pair<Expr, Expr> > vecSubs;
@@ -51,9 +56,22 @@ ProgressVector::ProgressVector(std::list<Value*> redefinition) {
 	//Here we compute the delta
 	vecExpr = vecExpr - firstExpr;
 
-	errs() << vecExpr << "\n";
+	errs() << "Final expr: " << vecExpr << "\n\n";
 
 }
 
+Value* ProgressVector::getUniqueValue(Type* constType) {
+
+	Value* result = NULL;
+
+	if (vecExpr.isNumber()) {
+		result = ConstantInt::get(constType, vecExpr.getNumber());
+		return result;
+	}
+
+	result = vecExpr.getUniqueValue();
+
+
+}
 
 } /* namespace llvm */

@@ -14,6 +14,11 @@
 static cl::opt<bool, false>
 usePericlesTripCount("usePericlesTripCount", cl::desc("Use Pericles's heuristic to estimate trip count."), cl::NotHidden);
 
+static cl::opt<bool, false>
+estimateMinimumTripCount("estimateMinimumTripCount", cl::desc("Estimate the minimum trip count of the loops."), cl::NotHidden);
+
+
+
 
 STATISTIC(NumInstrumentedLoops, 	"Number of Instrumented Loops");
 STATISTIC(NumUnknownConditions, 	"Number of Unknown Loop Conditions");
@@ -287,9 +292,56 @@ std::stack<T> invertStack(std::stack<T> input){
 }
 
 
+ProgressVector* TripCountGenerator::joinVectors(ProgressVector* Vec1, ProgressVector* Vec2){
+
+	/*
+	 * TODO: join variable vectors >>> Symbolic RA
+	 */
+
+
+	Value* Val1 = Vec1->getUniqueValue(Type::getInt64Ty(*context));
+	Value* Val2 = Vec2->getUniqueValue(Type::getInt64Ty(*context));
+
+	ConstantInt* C1 = dyn_cast<ConstantInt>(Val1);
+	ConstantInt* C2 = dyn_cast<ConstantInt>(Val2);
+
+	if ((!C1) || (!C2)) return NULL;
+
+
+	int64_t V1  = C1->getValue().getSExtValue();
+	int64_t V2  = C2->getValue().getSExtValue();
+
+	// Both vectors must have the same direction
+	if ( (V1 > 0 && V2 < 0) || (V2 > 0 && V1 < 0) ) return NULL;
+
+
+	if (V1 > 0 || V2 > 0) {
+
+		//estimateMinimumTripCount >> get the vector with greatest absolute size
+		if (estimateMinimumTripCount) {
+			return (V1 > V2 ? Vec1 : Vec2);
+		} else {
+			return (V1 < V2 ? Vec1 : Vec2);
+		}
+
+	} else {
+
+		//estimateMinimumTripCount >> get the vector with greatest absolute size
+		if (estimateMinimumTripCount) {
+			return (V1 < V2 ? Vec1 : Vec2);
+		} else {
+			return (V1 > V2 ? Vec1 : Vec2);
+		}
+
+	}
+
+}
+
+
 ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source, BasicBlock* loopHeader){
 
 
+	LoopInfoEx & li = getAnalysis<LoopInfoEx>();
 	LoopControllersDepGraph & lcd = getAnalysis<LoopControllersDepGraph>();
 	Graph* depGraph = lcd.depGraph;
 	depGraph->recomputeSCCs();
@@ -300,6 +352,15 @@ ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source
 
 
 	std::set<std::stack<GraphNode*> > paths = depGraph->getAcyclicPathsInsideSCC(sourceNode, sourceNode);
+
+	//When a value has no cycle (single-node SCC) we must give a force and create an artificial cycle that
+	//produces a vector with length zero
+	if (!paths.size()) {
+		std::stack<GraphNode*> forcedPath;
+		forcedPath.push(sourceNode);
+		forcedPath.push(sourceNode);
+		paths.insert(forcedPath);
+	}
 
 	//We will not analyze values with more than 999 paths of redefinitions
 	if (paths.size() > 999) return result;
@@ -340,18 +401,72 @@ ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source
 
 		}
 
+		//First and last node must be the same
+		path.push_front(path.back());
+
+
+		//Here we generate the vector for this specific path
 		ProgressVector* currentPathVector = new ProgressVector(path);
+		Value* currentVectorValue = currentPathVector->getUniqueValue(Type::getInt64Ty(*context));
+
+		bool fail = false;
+
+		if (currentVectorValue) {
+			errs() << "currentVectorValue: " << *currentVectorValue << "\n";
+
+			if (li.getLoopFor(loopHeader)->isLoopInvariant(currentVectorValue)) {
+
+				if (!result) result = currentPathVector;
+				else {
+					ProgressVector* tmp = joinVectors(result, currentPathVector);
+
+					if (!tmp) {
+						errs() << "Join Is NUll\n";
+						fail = true;
+					}
+					else {
+						errs() << "Join deu certo!\n";
+
+						if (tmp == result) delete currentPathVector;
+						else delete result;
+
+						result = tmp;
+					}
+				}
+
+			} else {
+				errs() << "Is not Loop Invariant\n";
+				fail = true;
+			}
 
 
+		} else {
+			errs() << "currentVectorValue is NULL\n";
 
+			fail = true;
+		}
+
+
+		if (fail) {
+			delete currentPathVector;
+			if (result) delete result;
+			return NULL;
+		}
+
+		if (result) {
+			errs() << "Result: " << *(result->getUniqueValue(Type::getInt64Ty(*context))) << "\n";
+		}
 
 	}
 
-
-
-
-
 	return result;
+}
+
+Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
+		BasicBlock* header, BasicBlock* entryBlock, Value* Op1, Value* Op2,
+		ProgressVector* V1, ProgressVector* V2, ICmpInst* CI) {
+
+	return NULL;
 }
 
 /*
@@ -521,17 +636,30 @@ void TripCountGenerator::generateVectorEstimatedTripCounts(Function &F){
 
 		}
 
-		if (!unknownTC) {
-			ProgressVector* V1 = generateConstantProgressVector(CI->getOperand(0), header);
-			ProgressVector* V2 = generateConstantProgressVector(CI->getOperand(1), header);
-		}
+		ProgressVector* V1 = NULL;
+		ProgressVector* V2 = NULL;
 
+
+		if (!unknownTC) {
+			V1 = generateConstantProgressVector(CI->getOperand(0), header);
+			V2 = generateConstantProgressVector(CI->getOperand(1), header);
+
+			if ((!V1) || (!V2)) {
+
+				errs() << "Not V1 or Not V2\n";
+
+				//TODO: Increment a statistic here
+				unknownTC = true;
+			}
+
+		}
 
 		if(!unknownTC) {
-			generatePericlesEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
+			generateVectorEstimatedTripCount(header, entryBlock, Op1, Op2, V1, V2, CI);
+			NumInstrumentedLoops++;
 		}
 
-		NumInstrumentedLoops++;
+
 	}
 
 }

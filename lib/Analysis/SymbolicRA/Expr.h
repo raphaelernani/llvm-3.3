@@ -31,8 +31,8 @@ public:
   Expr(APInt Int);
   Expr(GiNaC::ex Expr);
   Expr(Twine Name);
-  Expr(const Value *V);
-  Expr(const Value* V, int level);
+  Expr(Value *V);
+  Expr(Value* V, int level);
 
   Expr subs(vector<pair<Expr, Expr> > Subs); 
 
@@ -71,6 +71,9 @@ public:
   bool isPlusInf()          const;
   bool isMinusInf()         const;
   bool isNumber()           const;
+
+  int getNumber()			const;
+  Value* getUniqueValue()	const;
 
   static GiNaC::symbol& GetSymbol(const Value *V);
 

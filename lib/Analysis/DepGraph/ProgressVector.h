@@ -22,6 +22,8 @@ class ProgressVector {
 public:
 	ProgressVector(std::list<Value*> redefinition);
 	virtual ~ProgressVector() {}
+
+	Value* getUniqueValue(Type* constType);
 };
 
 } /* namespace llvm */
