@@ -24,6 +24,9 @@ public:
 	virtual ~ProgressVector() {}
 
 	Value* getUniqueValue(Type* constType);
+
+	bool isConstant();
+	int getConstantValue();
 };
 
 } /* namespace llvm */

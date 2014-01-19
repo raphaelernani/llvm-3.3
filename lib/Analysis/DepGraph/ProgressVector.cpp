@@ -62,16 +62,22 @@ ProgressVector::ProgressVector(std::list<Value*> redefinition) {
 
 Value* ProgressVector::getUniqueValue(Type* constType) {
 
-	Value* result = NULL;
-
 	if (vecExpr.isNumber()) {
-		result = ConstantInt::get(constType, vecExpr.getNumber());
-		return result;
+		return ConstantInt::get(constType, vecExpr.getNumber());
 	}
 
-	result = vecExpr.getUniqueValue();
-
-
+	return vecExpr.getUniqueValue();
 }
 
 } /* namespace llvm */
+
+bool ProgressVector::isConstant() {
+	return vecExpr.isNumber();
+}
+
+int ProgressVector::getConstantValue() {
+
+	assert(isConstant() && "Vector is not constant!");
+
+	return vecExpr.getNumber();
+}

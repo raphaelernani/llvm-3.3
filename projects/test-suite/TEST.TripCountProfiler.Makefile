@@ -29,7 +29,7 @@ else
 $(PROGRAMS_TO_TEST:%=Output/%.linked.rbc.instr.bc):  \
 Output/%.linked.rbc.instr.bc: Output/%.linked.rbc $(LOPT)
 	@-$(LOPT) -mem2reg -break-crit-edges -instnamer -stats -time-passes \
-		-load DepGraph.so -loop-normalizer -tc-profiler $< -o $<.tmp \
+		-load SymbolicRA.so -load DepGraph.so  $(TCFLAGS) -loop-normalizer -tc-generator -tc-profiler $< -o $<.tmp \
 		2>Output/$*.instrumentation.stats
 	clang -S -emit-llvm $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.c -o $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc
 	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.linked.rbc.instr.bc.info llvm-link $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc $<.tmp -o=$@

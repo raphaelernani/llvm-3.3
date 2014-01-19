@@ -27,6 +27,7 @@ namespace llvm {
 	private:
 		void MarkAsTripCount(Instruction& inst);
 		bool IsTripCount(Instruction& inst);
+		bool isIntervalComparison(ICmpInst* CI);
 	public:
 		static char ID;
 

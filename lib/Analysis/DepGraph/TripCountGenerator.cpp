@@ -18,12 +18,21 @@ static cl::opt<bool, false>
 estimateMinimumTripCount("estimateMinimumTripCount", cl::desc("Estimate the minimum trip count of the loops."), cl::NotHidden);
 
 
+STATISTIC(NumEstimatedTCs, 	"Number of Estimated Trip Counts");
+
+STATISTIC(NumIntervalLoops, "Number of Interval Loops");
+STATISTIC(NumEqualityLoops, "Number of Equality Loops");
+STATISTIC(NumOtherLoops,    "Number of Other Loops");
+
+STATISTIC(NumUnknownConditionsIL, "Number of Interval Loops With Unknown TripCount");
+STATISTIC(NumUnknownConditionsEL, "Number of Equality Loops With Unknown TripCount");
+STATISTIC(NumUnknownConditionsOL, "Number of Other Loops With Unknown TripCount");
+
+STATISTIC(NumIncompatibleOperandTypes, "Number of Loop Conditions With non-integer Operands");
 
 
-STATISTIC(NumInstrumentedLoops, 	"Number of Instrumented Loops");
-STATISTIC(NumUnknownConditions, 	"Number of Unknown Loop Conditions");
-STATISTIC(NumNonIntegerConditions, 	"Number of Non-Integer Loop Conditions");
-STATISTIC(ExitBlocksNotFound, 		"Number of Exit Blocks not found");
+
+
 
 using namespace llvm;
 
@@ -41,9 +50,15 @@ bool llvm::TripCountGenerator::doInitialization(Module& M) {
 
 	context = &M.getContext();
 
-	NumInstrumentedLoops = 0;
-	NumUnknownConditions = 0;
-	ExitBlocksNotFound = 0;
+	NumEstimatedTCs = 0;
+
+	NumIntervalLoops = 0;
+	NumEqualityLoops = 0;
+	NumOtherLoops = 0;
+
+	NumUnknownConditionsIL = 0;
+	NumUnknownConditionsEL = 0;
+	NumUnknownConditionsOL = 0;
 
 	return true;
 }
@@ -248,7 +263,8 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 		unsigned int prev_size = ln.entryBlocks[loopHeader]->getInstList().size();
 
 		Instruction* NEW_INST = InstToCopy->clone();
-		ln.entryBlocks[loopHeader]->getInstList().push_front(NEW_INST);
+		ln.entryBlocks[loopHeader]->getInstList().insert(ln.entryBlocks[loopHeader]->getFirstInsertionPt(), NEW_INST);
+
 
 		for(unsigned int i = 0; i < InstToCopy->getNumOperands(); i++){
 
@@ -262,7 +278,7 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 
 				//Undo changes in the entry block
 				while (ln.entryBlocks[loopHeader]->getInstList().size() > prev_size) {
-					ln.entryBlocks[loopHeader]->begin()->eraseFromParent();
+					ln.entryBlocks[loopHeader]->getFirstInsertionPt()->eraseFromParent();
 				}
 
 				return NULL;
@@ -462,11 +478,191 @@ ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source
 	return result;
 }
 
+void equalizeTypes(Value* &Op1, Value* &Op2, bool isSigned, IRBuilder<> Builder){
+
+	if (Op1->getType() != Op2->getType()) {
+
+		if (Op1->getType()->getIntegerBitWidth() > Op2->getType()->getIntegerBitWidth() ) {
+			//expand op2
+			if (isSigned) Op2 = Builder.CreateSExt(Op2, Op1->getType(), "");
+			else Op2 = Builder.CreateZExt(Op2, Op1->getType(), "");
+
+		} else {
+			//expand op1
+			if (isSigned) Op1 = Builder.CreateSExt(Op1, Op2->getType(), "");
+			else Op1 = Builder.CreateZExt(Op1, Op2->getType(), "");
+
+		}
+
+	}
+
+}
+
+
 Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
 		BasicBlock* header, BasicBlock* entryBlock, Value* Op1, Value* Op2,
 		ProgressVector* V1, ProgressVector* V2, ICmpInst* CI) {
 
-	return NULL;
+	//V1 and V2 are used to calculate the step
+	int _V1;
+	int _V2;
+	int step;
+
+	if (V1->isConstant() && V2->isConstant()) {
+
+		_V1 = V1->getConstantValue();
+		_V2 = V2->getConstantValue();
+
+	}	else {
+
+		/*
+		 * TODO: Deal with variable vectors
+		 */
+
+		return NULL;
+
+	}
+
+
+	bool isSigned = CI->isSigned();
+
+	BasicBlock* GT = BasicBlock::Create(*context, "", header->getParent(), header);
+	BasicBlock* LE = BasicBlock::Create(*context, "", header->getParent(), header);
+	BasicBlock* PHI = BasicBlock::Create(*context, "", header->getParent(), header);
+
+	TerminatorInst* T = entryBlock->getTerminator();
+
+	IRBuilder<> Builder(T);
+
+	//Make sure the two operands have the same type
+	equalizeTypes(Op1, Op2, isSigned, Builder);
+	assert(Op1->getType() == Op2->getType() && "Operands with different data types, even after adjust!");
+
+	Value* cmp;
+
+	if (isSigned)
+		cmp = Builder.CreateICmpSGT(Op1,Op2,"");
+	else
+		cmp = Builder.CreateICmpUGT(Op1,Op2,"");
+
+	Builder.CreateCondBr(cmp, GT, LE, NULL);
+	T->eraseFromParent();
+
+	/*
+	 * estimatedTripCount = |Op1 - Op2| / step
+	 *
+	 * We will create the same sub in both GT and in LE blocks, but
+	 * with inverted operand order. Thus, the result of the subtraction
+	 * will be always positive.
+	 *
+	 * We will calculate the step using the vectors of the two variables
+	 */
+
+	Builder.SetInsertPoint(GT);
+	Value* sub1;
+	if (isSigned) {
+		//We create a signed sub
+		sub1 = Builder.CreateNSWSub(Op1, Op2, "dIni");
+	} else {
+		//We create an unsigned sub
+		sub1 = Builder.CreateNUWSub(Op1, Op2, "dIni");
+	}
+
+	//Calculate the step based on the vectors of the two variables
+	step = _V2 - _V1;
+	//assert(step && "Non-termination detected!");
+
+	//Avoiding division by zero
+	if (step != 0) {
+
+		if (isSigned) {
+			//We create a signed div
+			sub1 = Builder.CreateSDiv(sub1, ConstantInt::get(sub1->getType(), step), "TC");
+		} else {
+			//We create an unsigned div
+			sub1 = Builder.CreateUDiv(sub1, ConstantInt::get(sub1->getType(), step), "TC");
+		}
+
+	}
+
+	Builder.CreateBr(PHI);
+
+
+	Builder.SetInsertPoint(LE);
+	Value* sub2;
+	if (isSigned) {
+		//We create a signed sub
+		sub2 = Builder.CreateNSWSub(Op2, Op1, "dIni");
+	} else {
+		//We create an unsigned sub
+		sub2 = Builder.CreateNUWSub(Op2, Op1, "dIni");
+	}
+
+	//Calculate the step based on the vectors of the two variables
+	step = _V1 - _V2;
+	//assert(step && "Non-termination detected!");
+
+	//Avoiding division by zero
+	if (step != 0) {
+		if (isSigned) {
+			//We create a signed div
+			sub2 = Builder.CreateSDiv(sub2, ConstantInt::get(sub2->getType(), step), "TC");
+		} else {
+			//We create an unsigned div
+			sub2 = Builder.CreateUDiv(sub2, ConstantInt::get(sub2->getType(), step), "TC");
+		}
+	}
+
+	Builder.CreateBr(PHI);
+
+	Builder.SetInsertPoint(PHI);
+	PHINode* sub = Builder.CreatePHI(sub2->getType(), 2, "");
+	sub->addIncoming(sub1, GT);
+	sub->addIncoming(sub2, LE);
+
+
+	Value* EstimatedTripCount;
+	if (isSigned) 	EstimatedTripCount = Builder.CreateSExtOrBitCast(sub, Type::getInt64Ty(*context), "EstimatedTripCount");
+	else			EstimatedTripCount = Builder.CreateZExtOrBitCast(sub, Type::getInt64Ty(*context), "EstimatedTripCount");
+
+	switch(CI->getPredicate()){
+		case CmpInst::ICMP_UGE:
+		case CmpInst::ICMP_ULE:
+		case CmpInst::ICMP_SGE:
+		case CmpInst::ICMP_SLE:
+			{
+				Constant* One = ConstantInt::get(EstimatedTripCount->getType(), 1);
+				EstimatedTripCount = Builder.CreateAdd(EstimatedTripCount, One);
+				break;
+			}
+		default:
+			break;
+	}
+
+	//Insert a metadata to identify the instruction as the EstimatedTripCount
+	Instruction* i = dyn_cast<Instruction>(EstimatedTripCount);
+	MarkAsTripCount(*i);
+
+	Builder.CreateBr(header);
+
+	//Adjust the PHINodes of the loop header accordingly
+	//
+	//This is necessary because one of the incoming blocks of the loop header has changed
+	for (BasicBlock::iterator it = header->begin(); it != header->end(); it++){
+		Instruction* tmp = it;
+
+		if (PHINode* I = dyn_cast<PHINode>(tmp)){
+			int i = I->getBasicBlockIndex(entryBlock);
+			if (i >= 0){
+				I->setIncomingBlock(i,PHI);
+			}
+		}
+
+	}
+
+
+
+	return EstimatedTripCount;
 }
 
 /*
@@ -517,7 +713,24 @@ BasicBlock* TripCountGenerator::findLoopControllerBlock(Loop* l){
 	return *(exitBlocks.begin());
 }
 
+bool TripCountGenerator::isIntervalComparison(ICmpInst* CI){
 
+	switch(CI->getPredicate()){
+	case ICmpInst::ICMP_SGE:
+	case ICmpInst::ICMP_SGT:
+	case ICmpInst::ICMP_UGE:
+	case ICmpInst::ICMP_UGT:
+	case ICmpInst::ICMP_SLE:
+	case ICmpInst::ICMP_SLT:
+	case ICmpInst::ICMP_ULE:
+	case ICmpInst::ICMP_ULT:
+		return true;
+		break;
+	default:
+		return false;
+	}
+
+}
 
 void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 
@@ -550,14 +763,34 @@ void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 		Value* Op1 = NULL;
 		Value* Op2 = NULL;
 
-		if (!CI) unknownTC = true;
+		int LoopClass = 0;
+
+		if (!CI) {
+			unknownTC = true;
+			NumOtherLoops++;
+			NumUnknownConditionsOL++;
+
+			LoopClass = 2;
+		}
 		else {
+
+			if (isIntervalComparison(CI)) {
+				LoopClass = 0;
+				NumIntervalLoops++;
+			} else {
+				LoopClass = 1;
+				NumEqualityLoops++;
+			}
+
 			Op1 = getValueAtEntryPoint(CI->getOperand(0), header);
 			Op2 = getValueAtEntryPoint(CI->getOperand(1), header);
 
 
 			if((!Op1) || (!Op2) ) {
-				NumUnknownConditions++;
+
+				if (!LoopClass) NumUnknownConditionsIL++;
+				else 			NumUnknownConditionsEL++;
+
 				unknownTC = true;
 			} else {
 
@@ -567,7 +800,7 @@ void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 					/*
 					 * We only handle integer loop conditions
 					 */
-					NumNonIntegerConditions++;
+					NumIncompatibleOperandTypes++;
 					unknownTC = true;
 				}
 
@@ -577,9 +810,10 @@ void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 
 		if(!unknownTC) {
 			generatePericlesEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
+			NumEstimatedTCs++;
 		}
 
-		NumInstrumentedLoops++;
+
 	}
 
 }
@@ -618,20 +852,35 @@ void TripCountGenerator::generateVectorEstimatedTripCounts(Function &F){
 
 		if (!CI) unknownTC = true;
 		else {
-			//Get the value of the operands before the first iteration
+
+			int LoopClass;
+			if (isIntervalComparison(CI)) {
+				LoopClass = 0;
+				NumIntervalLoops++;
+			} else {
+				LoopClass = 1;
+				NumEqualityLoops++;
+			}
+
 			Op1 = getValueAtEntryPoint(CI->getOperand(0), header);
 			Op2 = getValueAtEntryPoint(CI->getOperand(1), header);
 
-			//Check if the values are OK
+
 			if((!Op1) || (!Op2) ) {
-				NumUnknownConditions++;
+
+				if (!LoopClass) NumUnknownConditionsIL++;
+				else 			NumUnknownConditionsEL++;
+
 				unknownTC = true;
 			} else {
-				//We only handle loop conditions that compares integer variables
+
+
 				if (!(Op1->getType()->isIntegerTy() && Op2->getType()->isIntegerTy())) {
-					NumNonIntegerConditions++;
+					//We only handle loop conditions that compares integer variables
+					NumIncompatibleOperandTypes++;
 					unknownTC = true;
 				}
+
 			}
 
 		}
@@ -656,7 +905,7 @@ void TripCountGenerator::generateVectorEstimatedTripCounts(Function &F){
 
 		if(!unknownTC) {
 			generateVectorEstimatedTripCount(header, entryBlock, Op1, Op2, V1, V2, CI);
-			NumInstrumentedLoops++;
+			NumEstimatedTCs++;
 		}
 
 
