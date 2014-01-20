@@ -15,10 +15,15 @@ static cl::opt<bool, false>
 usePericlesTripCount("usePericlesTripCount", cl::desc("Use Pericles's heuristic to estimate trip count."), cl::NotHidden);
 
 static cl::opt<bool, false>
+useHybridTripCount("useHybridTripCount", cl::desc("Use Hybrid heuristic (Vector + Pericles) to estimate trip count."), cl::NotHidden);
+
+
+static cl::opt<bool, false>
 estimateMinimumTripCount("estimateMinimumTripCount", cl::desc("Estimate the minimum trip count of the loops."), cl::NotHidden);
 
 
-STATISTIC(NumEstimatedTCs, 	"Number of Estimated Trip Counts");
+STATISTIC(NumVectorEstimatedTCs, 	"Number of Estimated Trip Counts by Vector");
+STATISTIC(NumPericlesEstimatedTCs, 	"Number of Estimated Trip Counts by Pericles");
 
 STATISTIC(NumIntervalLoops, "Number of Interval Loops");
 STATISTIC(NumEqualityLoops, "Number of Equality Loops");
@@ -50,7 +55,8 @@ bool llvm::TripCountGenerator::doInitialization(Module& M) {
 
 	context = &M.getContext();
 
-	NumEstimatedTCs = 0;
+	NumVectorEstimatedTCs = 0;
+	NumPericlesEstimatedTCs = 0;
 
 	NumIntervalLoops = 0;
 	NumEqualityLoops = 0;
@@ -665,6 +671,103 @@ Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
 	return EstimatedTripCount;
 }
 
+void llvm::TripCountGenerator::generateHybridEstimatedTripCounts(Function& F) {
+
+	LoopInfoEx& li = getAnalysis<LoopInfoEx>();
+	LoopNormalizerAnalysis& ln = getAnalysis<LoopNormalizerAnalysis>();
+
+	for(LoopInfoEx::iterator lit = li.begin(); lit != li.end(); lit++){
+
+		//Indicates if we don't have ways to determine the trip count
+		bool unknownTC = false;
+
+		Loop* loop = *lit;
+
+		BasicBlock* header = loop->getHeader();
+		BasicBlock* entryBlock = ln.entryBlocks[header];
+
+		/*
+		 * Here we are looking for the predicate that stops the loop.
+		 *
+		 * At this moment, we are only considering loops that are controlled by
+		 * integer comparisons.
+		 */
+		BasicBlock* exitBlock = findLoopControllerBlock(loop);
+		assert(exitBlock && "Exiting Block not found!");
+
+		TerminatorInst* T = exitBlock->getTerminator();
+		BranchInst* BI = dyn_cast<BranchInst>(T);
+		ICmpInst* CI = BI ? dyn_cast<ICmpInst>(BI->getCondition()) : NULL;
+
+		Value* Op1 = NULL;
+		Value* Op2 = NULL;
+
+		if (!CI) unknownTC = true;
+		else {
+
+			int LoopClass;
+			if (isIntervalComparison(CI)) {
+				LoopClass = 0;
+				NumIntervalLoops++;
+			} else {
+				LoopClass = 1;
+				NumEqualityLoops++;
+			}
+
+			Op1 = getValueAtEntryPoint(CI->getOperand(0), header);
+			Op2 = getValueAtEntryPoint(CI->getOperand(1), header);
+
+
+			if((!Op1) || (!Op2) ) {
+
+				if (!LoopClass) NumUnknownConditionsIL++;
+				else 			NumUnknownConditionsEL++;
+
+				unknownTC = true;
+			} else {
+
+
+				if (!(Op1->getType()->isIntegerTy() && Op2->getType()->isIntegerTy())) {
+					//We only handle loop conditions that compares integer variables
+					NumIncompatibleOperandTypes++;
+					unknownTC = true;
+				}
+
+			}
+
+		}
+
+		ProgressVector* V1 = NULL;
+		ProgressVector* V2 = NULL;
+
+
+
+		if (!unknownTC) {
+			V1 = generateConstantProgressVector(CI->getOperand(0), header);
+			V2 = generateConstantProgressVector(CI->getOperand(1), header);
+
+			//No vectors available? Try Pericles instead!
+			if ((!V1) || (!V2)) {
+
+				generatePericlesEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
+				NumPericlesEstimatedTCs++;
+
+				//This will avoid  calling generateVectorEstimatedTripCount
+				unknownTC = true;
+			}
+
+		}
+
+		if(!unknownTC) {
+			generateVectorEstimatedTripCount(header, entryBlock, Op1, Op2, V1, V2, CI);
+			NumVectorEstimatedTCs++;
+		}
+
+
+	}
+
+}
+
 /*
  * Given a natural loop, find the basic block that is more likely block that
  * controls the number of iteration of a loop.
@@ -810,7 +913,7 @@ void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 
 		if(!unknownTC) {
 			generatePericlesEstimatedTripCount(header, entryBlock, Op1, Op2, CI);
-			NumEstimatedTCs++;
+			NumPericlesEstimatedTCs++;
 		}
 
 
@@ -905,7 +1008,7 @@ void TripCountGenerator::generateVectorEstimatedTripCounts(Function &F){
 
 		if(!unknownTC) {
 			generateVectorEstimatedTripCount(header, entryBlock, Op1, Op2, V1, V2, CI);
-			NumEstimatedTCs++;
+			NumVectorEstimatedTCs++;
 		}
 
 
@@ -917,6 +1020,8 @@ bool TripCountGenerator::runOnFunction(Function &F){
 
 	if (usePericlesTripCount)
 		generatePericlesEstimatedTripCounts(F);
+	else if (useHybridTripCount)
+		generateHybridEstimatedTripCounts(F);
 	else
 		generateVectorEstimatedTripCounts(F);
 

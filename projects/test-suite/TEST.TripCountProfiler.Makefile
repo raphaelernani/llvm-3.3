@@ -13,19 +13,10 @@ PROCESSLOOPS := $(PROGDIR)/processLoops.sh
 
 REPORTS_TO_GEN := nat instr
 REPORT_DEPENDENCIES := $(LOPT)
-ifndef DISABLE_LLC
-REPORTS_TO_GEN +=  llc compile
 REPORT_DEPENDENCIES += $(LLC) $(LOPT)
-endif
 REPORTS_SUFFIX := $(addsuffix .report.txt, $(REPORTS_TO_GEN))
 
 #Instrumentation Step
-ifdef NO_INSTRUMENT
-$(PROGRAMS_TO_TEST:%=Output/%.linked.rbc.instr.bc):  \
-Output/%.linked.rbc.instr.bc: Output/%.linked.rbc $(LOPT)
-	@-$(LOPT) -mem2reg -break-crit-edges -instnamer -stats -time-passes \
-		$< -o $@		
-else
 $(PROGRAMS_TO_TEST:%=Output/%.linked.rbc.instr.bc):  \
 Output/%.linked.rbc.instr.bc: Output/%.linked.rbc $(LOPT)
 	@-$(LOPT) -mem2reg -break-crit-edges -instnamer -stats -time-passes \
@@ -33,7 +24,7 @@ Output/%.linked.rbc.instr.bc: Output/%.linked.rbc $(LOPT)
 		2>Output/$*.instrumentation.stats
 	clang -S -emit-llvm $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.c -o $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc
 	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.linked.rbc.instr.bc.info llvm-link $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc $<.tmp -o=$@
-endif
+
 
 #Output of the Instrumentation step
 $(PROGRAMS_TO_TEST:%=Output/%.instrumentation.stats): \
@@ -119,6 +110,7 @@ Output/%.exe-llc-instr: Output/%.diff-llc-instr
 # Instrumented tests
 $(PROGRAMS_TO_TEST:%=Output/%.nightly.instr.report.txt): \
 Output/%.nightly.instr.report.txt: Output/%.exe-llc-instr Output/%.out-llc-instr-loops Output/%.loops.out Output/%.instrumentation.stats
+	$(VERB) $(RM) -f $@	
 	@echo > $@
 	@-if test -f Output/$*.exe-llc-instr; then \
 	  head -n 100 Output/$*.exe-llc-instr >> $@; \
@@ -196,3 +188,5 @@ test.$(TEST).%: Output/%.$(TEST).report.txt
 $(PROGRAMS_TO_TEST:%=build.$(TEST).%): \
 build.$(TEST).%: Output/%.llc
 	@echo "Finished Building: $<"
+
+

@@ -56,6 +56,8 @@ namespace llvm {
 		Value* generateVectorEstimatedTripCount(BasicBlock* header, BasicBlock* entryBlock, Value* Op1, Value* Op2, ProgressVector* V1, ProgressVector* V2, ICmpInst* CI);
 		ProgressVector* joinVectors(ProgressVector* Vec1, ProgressVector* Vec2);
 
+		void generateHybridEstimatedTripCounts(Function &F);
+
 		Value* getValueAtEntryPoint(Value* source, BasicBlock* loopHeader);
 
 		ProgressVector* generateConstantProgressVector(Value* source, BasicBlock* loopHeader);

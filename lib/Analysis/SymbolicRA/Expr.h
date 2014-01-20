@@ -93,6 +93,7 @@ protected:
 
 private:
   GiNaC::ex Expr_;
+  void init(Value* V, int level);
 };
 
 class TestExpr : public ModulePass {

@@ -242,14 +242,10 @@ Expr::Expr(Twine Name)
 static DenseMap<std::pair<Value*, int>, GiNaC::ex> Exprs;
 static std::map<std::string, Value*> RevExprs;
 
-Expr::Expr(Value *V) : Expr(V,0) {}
-
-Expr::Expr(Value *V, int level) {
-
+void Expr::init(Value* V, int level){
 	//Level 0: stop recursion
 	//Level 1: recursion just one time
 	//Level 2: unlimited recursion
-
 
   assert(V && "Constructor expected non-null parameter");
   
@@ -345,6 +341,15 @@ Expr::Expr(Value *V, int level) {
   Expr tmp(V,0);
   Expr_ = tmp.getExpr();
 
+}
+
+
+Expr::Expr(Value *V) {
+	init(V,0);
+}
+
+Expr::Expr(Value *V, int level) {
+	init(V,level);
 }
 
 Expr Expr::subs(std::vector<std::pair<Expr, Expr> > Subs) { 

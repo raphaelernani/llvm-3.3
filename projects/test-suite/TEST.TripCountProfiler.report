@@ -77,7 +77,8 @@ $HilightColumns{9} = 1;
  ["Program"  , '\'([^\']+)\' Program'],
  [],
 # TripCountGenerator
- ["NumEstimatedTCs"                 , '([0-9]+).*Number of Estimated Trip Counts'],
+ ["NumVectorEstimatedTCs"           , '([0-9]+).*Number of Estimated Trip Counts by Vector'],
+ ["NumPericlesEstimatedTCs"         , '([0-9]+).*Number of Estimated Trip Counts by Pericles'],
  ["NumIntervalLoops"                , '([0-9]+).*Number of Interval Loops'],
  ["NumEqualityLoops"                , '([0-9]+).*Number of Equality Loops'], 
  ["NumOtherLoops"                   , '([0-9]+).*Number of Other Loops'],
