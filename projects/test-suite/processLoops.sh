@@ -73,70 +73,70 @@ awk '{
         total+=$5
      } END {
         if (numLinesT0G0 > 0) {
-            printf "TripCount Accuracy (Interval Loops, Group 0)	%d\n", totalT0G0;
+            printf "TripCount Accuracy (Interval Loops, Group 0)	%d\n", numLinesT0G0;
         } 
         if (numLinesT0G1 > 0) {
-            printf "TripCount Accuracy (Interval Loops, Group 1)	%d\n", totalT0G1;
+            printf "TripCount Accuracy (Interval Loops, Group 1)	%d\n", numLinesT0G1;
         } 
          if (numLinesT0G2 > 0) {
-            printf "TripCount Accuracy (Interval Loops, Group 2)	%d\n", totalT0G2;
+            printf "TripCount Accuracy (Interval Loops, Group 2)	%d\n", numLinesT0G2;
         } 
         if (numLinesT0G3 > 0) {
-            printf "TripCount Accuracy (Interval Loops, Group 3)	%d\n", totalT0G3;
+            printf "TripCount Accuracy (Interval Loops, Group 3)	%d\n", numLinesT0G3;
         } 
         if (numLinesT0G4 > 0) {
-            printf "TripCount Accuracy (Interval Loops, Group 4)	%d\n", totalT0G4;
+            printf "TripCount Accuracy (Interval Loops, Group 4)	%d\n", numLinesT0G4;
         } 
         if (numLinesT0G5 > 0) {
-            printf "TripCount Accuracy (Interval Loops, Group 5)	%d\n", totalT0G5;
+            printf "TripCount Accuracy (Interval Loops, Group 5)	%d\n", numLinesT0G5;
         } 
         if (numLinesT0G6 > 0) {
-            printf "TripCount Accuracy (Interval Loops, Group 6)	%d\n", totalT0G6;
+            printf "TripCount Accuracy (Interval Loops, Group 6)	%d\n", numLinesT0G6;
         } 
         if (numLinesT1G0 > 0) {
-            printf "TripCount Accuracy (Equality Loops, Group 0)	%d\n", totalT1G0;
+            printf "TripCount Accuracy (Equality Loops, Group 0)	%d\n", numLinesT1G0;
         } 
         if (numLinesT1G1 > 0) {
-            printf "TripCount Accuracy (Equality Loops, Group 1)	%d\n", totalT1G1;
+            printf "TripCount Accuracy (Equality Loops, Group 1)	%d\n", numLinesT1G1;
         } 
         if (numLinesT1G2 > 0) {
-            printf "TripCount Accuracy (Equality Loops, Group 2)	%d\n", totalT1G2;
+            printf "TripCount Accuracy (Equality Loops, Group 2)	%d\n", numLinesT1G2;
         } 
         if (numLinesT1G3 > 0) {
-            printf "TripCount Accuracy (Equality Loops, Group 3)	%d\n", totalT1G3;
+            printf "TripCount Accuracy (Equality Loops, Group 3)	%d\n", numLinesT1G3;
         } 
         if (numLinesT1G4 > 0) {
-            printf "TripCount Accuracy (Equality Loops, Group 4)	%d\n", totalT1G4;
+            printf "TripCount Accuracy (Equality Loops, Group 4)	%d\n", numLinesT1G4;
         } 
         if (numLinesT1G5 > 0) {
-            printf "TripCount Accuracy (Equality Loops, Group 5)	%d\n", totalT1G5;
+            printf "TripCount Accuracy (Equality Loops, Group 5)	%d\n", numLinesT1G5;
         } 
         if (numLinesT1G6 > 0) {
-            printf "TripCount Accuracy (Equality Loops, Group 6)	%d\n", totalT1G6;  
+            printf "TripCount Accuracy (Equality Loops, Group 6)	%d\n", numLinesT1G6;  
         } 
         if (numLinesT2G0 > 0) {
-            printf "TripCount Accuracy (Other Loops, Group 0)	%d\n", totalT2G0;
+            printf "TripCount Accuracy (Other Loops, Group 0)	%d\n", numLinesT2G0;
         } 
         if (numLinesT2G1 > 0) {
-            printf "TripCount Accuracy (Other Loops, Group 1)	%d\n", totalT2G1;
+            printf "TripCount Accuracy (Other Loops, Group 1)	%d\n", numLinesT2G1;
         } 
         if (numLinesT2G2 > 0) {
-            printf "TripCount Accuracy (Other Loops, Group 2)	%d\n", totalT2G2;
+            printf "TripCount Accuracy (Other Loops, Group 2)	%d\n", numLinesT2G2;
         } 
         if (numLinesT2G3 > 0) {
-            printf "TripCount Accuracy (Other Loops, Group 3)	%d\n", totalT2G3;
+            printf "TripCount Accuracy (Other Loops, Group 3)	%d\n", numLinesT2G3;
         } 
         if (numLinesT2G4 > 0) {
-            printf "TripCount Accuracy (Other Loops, Group 4)	%d\n", totalT2G4;
+            printf "TripCount Accuracy (Other Loops, Group 4)	%d\n", numLinesT2G4;
         } 
         if (numLinesT2G5 > 0) {
-            printf "TripCount Accuracy (Other Loops, Group 5)	%d\n", totalT2G5;
+            printf "TripCount Accuracy (Other Loops, Group 5)	%d\n", numLinesT2G5;
         } 
         if (numLinesT2G6 > 0) {
-            printf "TripCount Accuracy (Other Loops, Group 6)	%d\n", totalT2G6;             
+            printf "TripCount Accuracy (Other Loops, Group 6)	%d\n", numLinesT2G6;             
         }
         
         if (numLines > 0) {
-            printf "TripCount Accuracy (All Loops)	%d\n", total;
+            printf "TripCount Accuracy (All Loops)	%d\n", numLines;
         }              
      }' $1
