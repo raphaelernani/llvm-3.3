@@ -11,6 +11,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "ginac/ginac.h"
+#include "ginac/flags.h"
 
 #include <algorithm>
 #include <map>
@@ -242,7 +243,7 @@ Expr::Expr(Twine Name)
 static DenseMap<std::pair<Value*, int>, GiNaC::ex> Exprs;
 static std::map<std::string, Value*> RevExprs;
 
-void Expr::init(Value* V, int level){
+void Expr::initExpr(Value* V, int level){
 	//Level 0: stop recursion
 	//Level 1: recursion just one time
 	//Level 2: unlimited recursion
@@ -344,11 +345,11 @@ void Expr::init(Value* V, int level){
 
 
 Expr::Expr(Value *V) {
-	init(V,0);
+	initExpr(V,0);
 }
 
 Expr::Expr(Value *V, int level) {
-	init(V,level);
+	initExpr(V,level);
 }
 
 Expr Expr::subs(std::vector<std::pair<Expr, Expr> > Subs) { 
@@ -558,7 +559,11 @@ int Expr::getNumber() const {
 
 	assert(isNumber() && "Expression is not a number!");
 
-	return Expr_.integer_content().to_int();
+	int number = Expr_.integer_content().to_int();
+
+	if(Expr_.info(GiNaC::info_flags::negative)) number = -number;
+
+	return number;
 }
 
 Value* Expr::getUniqueValue() const {

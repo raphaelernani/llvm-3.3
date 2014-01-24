@@ -508,6 +508,8 @@ Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
 		_V1 = V1->getConstantValue();
 		_V2 = V2->getConstantValue();
 
+
+
 	}	else {
 
 		/*
@@ -517,7 +519,6 @@ Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
 		return NULL;
 
 	}
-
 
 	bool isSigned = CI->isSigned();
 
