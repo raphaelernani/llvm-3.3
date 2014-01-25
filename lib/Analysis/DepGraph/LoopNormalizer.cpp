@@ -164,6 +164,7 @@ bool llvm::LoopNormalizer::runOnFunction(Function& F) {
 		Loop* loop = *it;
 
 		BasicBlock* header = loop->getHeader();
+		errs() << "Visiting loop with header: " << header->getName() << "\n";
 
 		std::set<BasicBlock*> OutsidePreHeaders;
 
