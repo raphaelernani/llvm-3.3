@@ -1,0 +1,22 @@
+##=== TEST.nightly.report - Report description for nightly -----*- perl -*-===##
+#
+# This file defines a report to be generated for the nightly tests.
+#
+##===----------------------------------------------------------------------===##
+
+# Sort by program name
+$SortCol = 0;
+$TrimRepeatedPrefix = 1;
+
+# These are the columns for the report.  The first entry is the header for the
+# column, the second is the regex to use to match the value.  Empty list create
+# separators, and closures may be put in for custom processing.
+(
+# Name
+ ["Program"  , '\'([^\']+)\' Program'],
+ [],
+# Times
+ ["NumInstructionsSSA"    , '([0-9]+).*Number of Instructions'],
+ ["NumInstructionsESSA", '([0-9]+).*Number of Instructions 2'],
+ ["NumInstructionsUSSA"    , '([0-9]+).*Number of Instructions 3'],
+);
