@@ -168,25 +168,27 @@ LoopStats* createLoopStats(int64_t new_ID, int LoopClass){
 
 void addInstance(LoopStats* Stats, int64_t tripCount, int64_t estimatedTripCount ){
 
-
 	int64_t GroupID;
 
-	if (estimatedTripCount <= sqrt((double)tripCount))
+	if (estimatedTripCount >= tripCount-1 && estimatedTripCount <= tripCount-1)
+			GroupID = 3;
+	else if (estimatedTripCount <= sqrt((double)tripCount))
 		GroupID = 0;
 	else if (estimatedTripCount <= tripCount/2)
 		GroupID = 1;
-	if (estimatedTripCount <= tripCount-2)
+	else if (estimatedTripCount <= tripCount-2)
 		GroupID = 2;
-	else if (estimatedTripCount >= tripCount-1 && estimatedTripCount <= tripCount-1)
-		GroupID = 3;
 	else if (estimatedTripCount <= tripCount*2)
 		GroupID = 4;
-	else if (estimatedTripCount >= tripCount*tripCount)
+	else if (estimatedTripCount <= tripCount*tripCount)
 		GroupID = 5;
 	else
 		GroupID = 6;
 
 	LoopResults* lr = getOrInsertLoopResult(&(Stats->T), GroupID);
+
+//	if (lr->numInstances == 0)
+//		fprintf(stderr, "Actual:%" PRId64 " Estimated:%" PRId64 "	Group: %d\n", tripCount, estimatedTripCount, (int)GroupID);
 
 	lr->numInstances++;
 }
@@ -247,7 +249,6 @@ void initLoopList(){
 
 void collectLoopData(int64_t LoopHeaderBBPointer, int64_t tripCount, int64_t estimatedTripCount, int LoopClass){
 	addInstance(getOrInsertLoop(&loops, LoopHeaderBBPointer, LoopClass), tripCount, estimatedTripCount);
-//	fprintf(stderr, "Actual:%" PRId64 " Estimated:%" PRId64 "\n", tripCount, estimatedTripCount);
 }
 
 void flushLoopStats(char* moduleIdentifier){
