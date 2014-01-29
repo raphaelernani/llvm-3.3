@@ -25,7 +25,7 @@ Output/%.$(TEST).report.txt: Output/%.linked.rbc $(LOPT) \
 	@echo "--------------------------------------------------------------" >> $@
 	@-if test -f $<; then \
 		$(LOPT) -mem2reg -instnamer -break-crit-edges \
-			 -load DepGraph.so -LoopStructure $< -stats -time-passes 2>> $@; \
+			 -load DepGraph.so -loop-normalizer -LoopStructure $< -stats -time-passes 2>> $@; \
 	fi
 	
 
