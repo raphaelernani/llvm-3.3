@@ -460,6 +460,7 @@ public:
                 int SCCID);
 
         bool hasNestedLoop(int SCCID);
+        bool hasNestedLoop(GraphNode* first);
 
         void getAcyclicPaths_rec(GraphNode* dst,
         		                 std::set<GraphNode*> &visitedNodes,
