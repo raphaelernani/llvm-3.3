@@ -494,45 +494,53 @@ void equalizeTypes(Value* &Op1, Value* &Op2, bool isSigned, IRBuilder<> Builder)
 }
 
 
-Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
-		BasicBlock* header, BasicBlock* entryBlock, Value* Op1, Value* Op2,
-		ProgressVector* V1, ProgressVector* V2, ICmpInst* CI) {
+Instruction* TripCountGenerator::generateReplaceIfEqual
+		(Value* Op, Value* ValueToTest, Value* ValueToReplace,
+				Instruction* InsertBefore){
 
-	//V1 and V2 are used to calculate the step
-	int _V1;
-	int _V2;
-	int step;
+	BasicBlock* startBB = InsertBefore->getParent();
+	BasicBlock* endBB = InsertBefore->getParent()->splitBasicBlock(InsertBefore);
 
-	if (V1->isConstant() && V2->isConstant()) {
+	TerminatorInst* T = startBB->getTerminator();
 
-		_V1 = V1->getConstantValue();
-		_V2 = V2->getConstantValue();
+	IRBuilder<> Builder(T);
 
+	BasicBlock* EQ = BasicBlock::Create(*context, "", InsertBefore->getParent()->getParent(), endBB);
 
+	Value* cmp;
+	cmp = Builder.CreateICmpEQ(Op,ValueToTest,"");
+	Builder.CreateCondBr(cmp, EQ, endBB, NULL);
+	T->eraseFromParent();
 
-	}	else {
+	Builder.SetInsertPoint(EQ);
+	Builder.CreateBr(endBB);
 
-		/*
-		 * TODO: Deal with variable vectors
-		 */
+	Builder.SetInsertPoint(InsertBefore);
+	PHINode* phi = Builder.CreatePHI(Op->getType(), 2, "");
+	phi->addIncoming(ValueToReplace, EQ);
+	phi->addIncoming(Op, startBB);
 
-		return NULL;
+	return phi;
 
-	}
+}
 
-	bool isSigned = CI->isSigned();
+Instruction* llvm::TripCountGenerator::generateModuleOfSubtraction
+		(Value* Op1, Value* Op2, bool isSigned, Instruction* InsertBefore){
 
-	BasicBlock* GT = BasicBlock::Create(*context, "", header->getParent(), header);
-	BasicBlock* LE = BasicBlock::Create(*context, "", header->getParent(), header);
-	BasicBlock* PHI = BasicBlock::Create(*context, "", header->getParent(), header);
+	BasicBlock* startBB = InsertBefore->getParent();
+	BasicBlock* endBB = InsertBefore->getParent()->splitBasicBlock(InsertBefore);
 
-	TerminatorInst* T = entryBlock->getTerminator();
+	TerminatorInst* T = startBB->getTerminator();
 
 	IRBuilder<> Builder(T);
 
 	//Make sure the two operands have the same type
 	equalizeTypes(Op1, Op2, isSigned, Builder);
 	assert(Op1->getType() == Op2->getType() && "Operands with different data types, even after adjust!");
+
+
+	BasicBlock* GT = BasicBlock::Create(*context, "", InsertBefore->getParent()->getParent(), endBB);
+	BasicBlock* LE = BasicBlock::Create(*context, "", InsertBefore->getParent()->getParent(), endBB);
 
 	Value* cmp;
 
@@ -545,81 +553,78 @@ Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
 	T->eraseFromParent();
 
 	/*
-	 * estimatedTripCount = |Op1 - Op2| / step
+	 * ModuleOfSubtraction = |Op1 - Op2|
 	 *
 	 * We will create the same sub in both GT and in LE blocks, but
 	 * with inverted operand order. Thus, the result of the subtraction
 	 * will be always positive.
-	 *
-	 * We will calculate the step using the vectors of the two variables
 	 */
 
 	Builder.SetInsertPoint(GT);
 	Value* sub1;
 	if (isSigned) {
 		//We create a signed sub
-		sub1 = Builder.CreateNSWSub(Op1, Op2, "dIni");
+		sub1 = Builder.CreateNSWSub(Op1, Op2, "diff");
 	} else {
 		//We create an unsigned sub
-		sub1 = Builder.CreateNUWSub(Op1, Op2, "dIni");
+		sub1 = Builder.CreateNUWSub(Op1, Op2, "diff");
 	}
-
-	//Calculate the step based on the vectors of the two variables
-	step = _V2 - _V1;
-	//assert(step && "Non-termination detected!");
-
-	//Avoiding division by zero
-	if (step != 0) {
-
-		if (isSigned) {
-			//We create a signed div
-			sub1 = Builder.CreateSDiv(sub1, ConstantInt::get(sub1->getType(), step), "TC");
-		} else {
-			//We create an unsigned div
-			sub1 = Builder.CreateUDiv(sub1, ConstantInt::get(sub1->getType(), step), "TC");
-		}
-
-	}
-
-	Builder.CreateBr(PHI);
+	Builder.CreateBr(endBB);
 
 
 	Builder.SetInsertPoint(LE);
 	Value* sub2;
 	if (isSigned) {
 		//We create a signed sub
-		sub2 = Builder.CreateNSWSub(Op2, Op1, "dIni");
+		sub2 = Builder.CreateNSWSub(Op2, Op1, "diff");
 	} else {
 		//We create an unsigned sub
-		sub2 = Builder.CreateNUWSub(Op2, Op1, "dIni");
+		sub2 = Builder.CreateNUWSub(Op2, Op1, "diff");
 	}
+	Builder.CreateBr(endBB);
 
-	//Calculate the step based on the vectors of the two variables
-	step = _V1 - _V2;
-	//assert(step && "Non-termination detected!");
-
-	//Avoiding division by zero
-	if (step != 0) {
-		if (isSigned) {
-			//We create a signed div
-			sub2 = Builder.CreateSDiv(sub2, ConstantInt::get(sub2->getType(), step), "TC");
-		} else {
-			//We create an unsigned div
-			sub2 = Builder.CreateUDiv(sub2, ConstantInt::get(sub2->getType(), step), "TC");
-		}
-	}
-
-	Builder.CreateBr(PHI);
-
-	Builder.SetInsertPoint(PHI);
+	Builder.SetInsertPoint(InsertBefore);
 	PHINode* sub = Builder.CreatePHI(sub2->getType(), 2, "");
 	sub->addIncoming(sub1, GT);
 	sub->addIncoming(sub2, LE);
 
+	return sub;
+}
 
-	Value* EstimatedTripCount;
-	if (isSigned) 	EstimatedTripCount = Builder.CreateSExtOrBitCast(sub, Type::getInt64Ty(*context), "EstimatedTripCount");
-	else			EstimatedTripCount = Builder.CreateZExtOrBitCast(sub, Type::getInt64Ty(*context), "EstimatedTripCount");
+
+Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
+		BasicBlock* header, BasicBlock* entryBlock, Value* Op1, Value* Op2,
+		ProgressVector* V1, ProgressVector* V2, ICmpInst* CI) {
+
+	Value* _V1 = V1->getUniqueValue(Op1->getType());
+	Value* _V2 = V2->getUniqueValue(Op1->getType());
+
+	if(!_V1 || !_V2) return NULL;
+
+	TerminatorInst* T = entryBlock->getTerminator();
+	bool isSigned = CI->isSigned();
+
+	Instruction* initialDistance = generateModuleOfSubtraction(Op1, Op2, isSigned, T);
+
+	Instruction* step = generateModuleOfSubtraction(_V1, _V2, isSigned, T);
+
+	//Preventing division by zero
+	step = generateReplaceIfEqual(step, ConstantInt::get(step->getType(),0), ConstantInt::get(step->getType(),1), T);
+
+	IRBuilder<> Builder(T);
+
+	Instruction* EstimatedTripCount;
+	if (isSigned) {
+		//We create a signed div
+		EstimatedTripCount = BinaryOperator::CreateSDiv(initialDistance, step, "TC", T);
+	} else {
+		//We create an unsigned div
+		EstimatedTripCount = BinaryOperator::CreateUDiv(initialDistance, step, "TC", T);
+	}
+
+	if (isSigned) 	EstimatedTripCount = CastInst::CreateSExtOrBitCast(EstimatedTripCount, Type::getInt64Ty(*context), "EstimatedTripCount", T);
+	else			EstimatedTripCount = CastInst::CreateSExtOrBitCast(EstimatedTripCount, Type::getInt64Ty(*context), "EstimatedTripCount", T);
+
 
 	switch(CI->getPredicate()){
 		case CmpInst::ICMP_UGE:
@@ -628,7 +633,7 @@ Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
 		case CmpInst::ICMP_SLE:
 			{
 				Constant* One = ConstantInt::get(EstimatedTripCount->getType(), 1);
-				EstimatedTripCount = Builder.CreateAdd(EstimatedTripCount, One);
+				EstimatedTripCount = BinaryOperator::CreateAdd(EstimatedTripCount, One, "", T);
 				break;
 			}
 		default:
@@ -636,10 +641,7 @@ Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
 	}
 
 	//Insert a metadata to identify the instruction as the EstimatedTripCount
-	Instruction* i = dyn_cast<Instruction>(EstimatedTripCount);
-	MarkAsTripCount(*i);
-
-	Builder.CreateBr(header);
+	MarkAsTripCount(*EstimatedTripCount);
 
 	//Adjust the PHINodes of the loop header accordingly
 	//
@@ -650,13 +652,11 @@ Value* llvm::TripCountGenerator::generateVectorEstimatedTripCount(
 		if (PHINode* I = dyn_cast<PHINode>(tmp)){
 			int i = I->getBasicBlockIndex(entryBlock);
 			if (i >= 0){
-				I->setIncomingBlock(i,PHI);
+				I->setIncomingBlock(i,EstimatedTripCount->getParent());
 			}
 		}
 
 	}
-
-
 
 	return EstimatedTripCount;
 }

@@ -414,7 +414,7 @@ bool TripCountProfiler::runOnFunction(Function &F){
 		Value* estimatedTripCount = tca.getTripCount(header);
 
 		if((!estimatedTripCount) && mustInstrument){
-			estimatedTripCount = unknownTripCount;
+			//estimatedTripCount = unknownTripCount;
 			NumUnknownTripCount++;
 		}
 
