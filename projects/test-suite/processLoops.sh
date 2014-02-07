@@ -68,6 +68,12 @@ awk '{
                 totalT2G6+=$5;
                 numLinesT2G6++; 
             }
+        } else if($2 == 3) {
+            totalT3+=$5;
+            numLinesT3++;
+        } else if($2 == 4) {
+            totalT4+=$5;
+            numLinesT4++;
         }
         numLines++; 
         total+=$5
@@ -155,6 +161,16 @@ awk '{
         if (numLinesT2G6 > 0) {
             printf "NumLoops (Equality Loops, Group 6)	%d\n", numLinesT2G6;
             printf "NumInstances (Equality Loops, Group 6)	%d\n", totalT2G6;  
+        }
+
+        if (numLinesT3 > 0) {
+            printf "NumLoops (Interval Loops, Unknown)	%d\n", numLinesT3;
+            printf "NumInstances (Interval Loops, Unknown)	%d\n", totalT3;  
+        }
+
+        if (numLinesT4 > 0) {
+            printf "NumLoops (Equality Loops, Unknown)	%d\n", numLinesT4;
+            printf "NumInstances (Equality Loops, Unknown)	%d\n", totalT4;  
         }
         
         if (numLines > 0) {

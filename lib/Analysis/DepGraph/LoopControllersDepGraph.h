@@ -13,16 +13,30 @@
 namespace llvm {
 
 class LoopControllersDepGraph: public FunctionPass {
+private:
+	Graph* fullGraph;
 public:
-		Graph* depGraph;
 
-		static char ID; // Pass identification, replacement for typeid.
-        LoopControllersDepGraph() :
-        	FunctionPass(ID), depGraph(NULL) {
-        }
-        void getAnalysisUsage(AnalysisUsage &AU) const;
-        bool runOnFunction(Function& F);
+	Graph* depGraph;
 
+	static char ID; // Pass identification, replacement for typeid.
+	LoopControllersDepGraph() :
+		FunctionPass(ID), depGraph(NULL), fullGraph(NULL) {
+	}
+	virtual ~LoopControllersDepGraph() {
+		freePerspectiveGraph();
+	}
+
+	void getAnalysisUsage(AnalysisUsage &AU) const;
+	bool runOnFunction(Function& F);
+
+	void freePerspectiveGraph();
+	void setPerspective(BasicBlock* LoopHeader);
+
+	void printPers(){
+		if (fullGraph == depGraph)	errs() << "Full!\n";
+		else errs() << "Pers!	Full:" << fullGraph->getNumVarNodes() << "	Slice:" << depGraph->getNumVarNodes() <<  "\n"   ;
+	}
 
 };
 
@@ -37,6 +51,8 @@ public:
         void getAnalysisUsage(AnalysisUsage &AU) const;
         bool runOnModule(Module& M);
 
+
+        void setPerspective(BasicBlock* LoopHeader);
 
 };
 

@@ -220,59 +220,60 @@ bool LoopStructure::runOnFunction(Function& F) {
 
 			if (Condition) {
 
-				GraphNode* ConditionNode = graph->findNode(Condition);
+				if (GraphNode* ConditionNode = graph->findNode(Condition)) {
 
-				std::set<GraphNode*> tmp = visitedNodes;
-				std::map<int, GraphNode*> firstNodeVisitedPerSCC;
+					std::set<GraphNode*> tmp = visitedNodes;
+					std::map<int, GraphNode*> firstNodeVisitedPerSCC;
 
-				//Avoid visiting the same node twice
-				graph->dfsVisitBack_ext(ConditionNode, visitedNodes, firstNodeVisitedPerSCC);
+					//Avoid visiting the same node twice
+					graph->dfsVisitBack_ext(ConditionNode, visitedNodes, firstNodeVisitedPerSCC);
 
-				std::set<GraphNode*> delta = getDelta(visitedNodes, tmp);
+					std::set<GraphNode*> delta = getDelta(visitedNodes, tmp);
 
-				//Iterate over the dependencies
-				for (std::set<GraphNode*>::iterator nIt = delta.begin(); nIt != delta.end(); nIt++ ) {
+					//Iterate over the dependencies
+					for (std::set<GraphNode*>::iterator nIt = delta.begin(); nIt != delta.end(); nIt++ ) {
 
-					GraphNode* CurrentNode = *nIt;
+						GraphNode* CurrentNode = *nIt;
 
-					int SCCID = graph->getSCCID(CurrentNode);
+						int SCCID = graph->getSCCID(CurrentNode);
 
-					if (graph->getSCC(SCCID).size() > 1) {
+						if (graph->getSCC(SCCID).size() > 1) {
 
-						//Count the number of paths only once per SCC
-						if (!analyzedSCCs.count(SCCID)) {
-							analyzedSCCs.insert(SCCID);
+							//Count the number of paths only once per SCC
+							if (!analyzedSCCs.count(SCCID)) {
+								analyzedSCCs.insert(SCCID);
 
-							NumMultiNodeSCCs++;
+								NumMultiNodeSCCs++;
 
-							GraphNode* firstNodeVisitedInSCC = firstNodeVisitedPerSCC[SCCID];
+								GraphNode* firstNodeVisitedInSCC = firstNodeVisitedPerSCC[SCCID];
 
-							std::set<std::stack<GraphNode*> > paths = graph->getAcyclicPathsInsideSCC(firstNodeVisitedInSCC, firstNodeVisitedInSCC);
+								std::set<std::stack<GraphNode*> > paths = graph->getAcyclicPathsInsideSCC(firstNodeVisitedInSCC, firstNodeVisitedInSCC);
 
-							if (paths.size() == 1){
-								NumSinglePathSCCs++;
-							} else {
-								NumMultiPathSCCs++;
-
-								if (graph->hasNestedLoop(firstNodeVisitedInSCC)){
-									NumNestedLoopSCCs++;
+								if (paths.size() == 1){
+									NumSinglePathSCCs++;
 								} else {
-									NumSingleLoopSCCs++;
+									NumMultiPathSCCs++;
+
+									if (graph->hasNestedLoop(firstNodeVisitedInSCC)){
+										NumNestedLoopSCCs++;
+									} else {
+										NumSingleLoopSCCs++;
+									}
+
 								}
 
 							}
 
+						} else {
+							//Count the number of paths only once per SCC
+							if (!analyzedSCCs.count(SCCID)) {
+								analyzedSCCs.insert(SCCID);
+
+								NumSingleNodeSCCs++;
+							}
 						}
 
-					} else {
-						//Count the number of paths only once per SCC
-						if (!analyzedSCCs.count(SCCID)) {
-							analyzedSCCs.insert(SCCID);
-
-							NumSingleNodeSCCs++;
-						}
 					}
-
 				}
 
 			}

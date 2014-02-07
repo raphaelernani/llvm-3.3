@@ -59,7 +59,7 @@ CPPFLAGS += -DNDEBUG=1                            \
 RUN_OPTIONS      = omnetpp.ini
 STDOUT_FILENAME := omnetpp.log
 
-LDFLAGS = -lstdc++ -lm
+#LDFLAGS = -lstdc++ -lm
 LIBS    = -lm
 
 include ../../Makefile.spec2006

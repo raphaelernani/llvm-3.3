@@ -354,6 +354,22 @@ Graph Graph::generateSubGraph(int SCCID){
 
 }
 
+//Creates an entirely new graph, with equivalent nodes and edges
+Graph* Graph::clone(){
+
+	Graph* result;
+
+	result = new Graph(AS); //Somebody has to free this memory at some point in the future
+	*result = makeSubGraph(nodes);
+	result->parentGraph = NULL;  //Make the graphs independent
+
+	result->sCCs.clear();
+	result->reverseSCCMap.clear();
+
+	return result;
+
+}
+
 Graph Graph::makeSubGraph(std::set<GraphNode*> nodeList){
 
     Graph G(this->AS);

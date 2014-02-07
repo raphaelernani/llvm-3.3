@@ -379,8 +379,8 @@ public:
 
 
 
-
-
+        //Creates an entirely new graph, with equivalent nodes and edges
+        Graph* clone();
 
         Graph makeSubGraph(std::set<GraphNode*> nodeList);
 
