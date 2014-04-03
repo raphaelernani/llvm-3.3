@@ -145,16 +145,16 @@ Value* TripCountProfiler::getValueAtEntryPoint(Value* source, BasicBlock* loopHe
 	}
 
 	int SCCID = lcd.depGraph->getSCCID(node);
-	Graph sccGraph = lcd.depGraph->generateSubGraph(SCCID);
+	DepGraph sccGraph = lcd.depGraph->generateSubGraph(SCCID);
 
-	for(Graph::iterator it =  sccGraph.begin(); it != sccGraph.end(); it++){
+	for(DepGraph::iterator it =  sccGraph.begin(); it != sccGraph.end(); it++){
 
 		Value* V = NULL;
 
 		if (VarNode* VN = dyn_cast<VarNode>(*it)) {
 			V = VN->getValue();
 		} else	if (OpNode* ON = dyn_cast<OpNode>(*it)) {
-			V = ON->getValue();
+			V = ON->getOperation();
 		}
 
 		if (V) {

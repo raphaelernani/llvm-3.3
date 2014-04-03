@@ -28,7 +28,7 @@ STATISTIC(NumSCCWithTwoOrMoreNodes, "Number of SCCs with two or more nodes");
 
 class DepGraphSCCAnalysis: public FunctionPass {
 private:
-	Graph *g;
+	DepGraph *g;
 
 public:
 	static char ID; // Pass identification, replacement for typeid.
@@ -54,8 +54,8 @@ public:
 
 	bool runOnFunction(Function& F) {
 
-		LoopControllersDepGraph& DepGraph = getAnalysis<LoopControllersDepGraph> ();
-		Graph *g = DepGraph.depGraph;
+		LoopControllersDepGraph& DepGraphPass = getAnalysis<LoopControllersDepGraph> ();
+		DepGraph *g = DepGraphPass.depGraph;
 
 		std::map<int, std::set<GraphNode*> > SCCs = g->getSCCs();
 
@@ -76,7 +76,7 @@ public:
 			for(std::set<GraphNode*>::iterator node = it->second.begin(); node != it->second.end(); node++) {
 				GraphNode* N = *node;
 				if (OpNode* On = dyn_cast<OpNode>(N)){
-					if(Value* V = On->getValue()){
+					if(Value* V = On->getOperation()){
 						if(Instruction* I = dyn_cast<Instruction>(V)) {
 							Function* F = I->getParent()->getParent();
 							if(!SCCFunctions.count(F)) SCCFunctions.insert(F);
@@ -112,7 +112,7 @@ static RegisterPass<DepGraphSCCAnalysis> X("depgraph-scc-analysis",
 
 class ModuleDepGraphSCCAnalysis: public ModulePass {
 private:
-	Graph *g;
+	DepGraph *g;
 
 public:
 	static char ID; // Pass identification, replacement for typeid.
@@ -129,8 +129,8 @@ public:
 
 	bool runOnModule(Module& M) {
 
-		ModuleLoopControllersDepGraph& DepGraph = getAnalysis<ModuleLoopControllersDepGraph> ();
-		Graph *g = DepGraph.depGraph;
+		ModuleLoopControllersDepGraph& DepGraphPass = getAnalysis<ModuleLoopControllersDepGraph> ();
+		DepGraph *g = DepGraphPass.depGraph;
 
 		//g->unifyBackEdges();
 
@@ -154,7 +154,7 @@ public:
 			for(std::set<GraphNode*>::iterator node = it->second.begin(); node != it->second.end(); node++) {
 				GraphNode* N = *node;
 				if (OpNode* On = dyn_cast<OpNode>(N)){
-					if(Value* V = On->getValue()){
+					if(Value* V = On->getOperation()){
 						if(Instruction* I = dyn_cast<Instruction>(V)) {
 							Function* F = I->getParent()->getParent();
 							if(!SCCFunctions.count(F)) SCCFunctions.insert(F);

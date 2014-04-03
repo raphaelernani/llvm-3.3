@@ -24,7 +24,7 @@ extern int CHno;
 /* FUNCTION: create_point - creats a point for the circular list 
              containing the points on the convex hull                    */
 
-CHpoints *create_point(point p) {
+CHpoints *create_point(Point p) {
   CHpoints *new_point;
   if (!(new_point = (CHpoints *)malloc(sizeof(CHpoints)))) {
     printf("Can't create point\n");
@@ -41,7 +41,7 @@ CHpoints *create_point(point p) {
 /* PROCEDURE: point_list_insert - inserts a new point in the circular 
               list.                                                     */
     
-void point_list_insert(CHpoints **PL, point p) {
+void point_list_insert(CHpoints **PL, Point p) {
   CHpoints *temp;
   
   CHno++;                       /* increase the number of CHnodes by one */  
@@ -81,7 +81,7 @@ CHpoints *next(CHpoints *P) {
 
 double angle(CHpoints *p1, CHpoints *p2, CHpoints *p3) {
   double dot_product,la2,lb2,v;
-  point a,b;
+  Point a,b;
   
   a=vector(p2->node,p1->node);
   b=vector(p2->node,p3->node);
@@ -113,7 +113,7 @@ void number_points(CHpoints *PL) {
 
 CHpoints *remove_points(CHpoints *PL) {
   CHpoints *temp,*rem;
-  point a,c,b; 
+  Point a,c,b; 
   int i=0;
   bool done;
   done=false;

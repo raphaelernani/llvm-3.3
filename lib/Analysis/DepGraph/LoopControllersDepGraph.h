@@ -14,7 +14,7 @@ namespace llvm {
 
 class LoopControllersDepGraph: public FunctionPass {
 public:
-		Graph* depGraph;
+		DepGraph* depGraph;
 
 		static char ID; // Pass identification, replacement for typeid.
         LoopControllersDepGraph() :
@@ -28,7 +28,7 @@ public:
 
 class ModuleLoopControllersDepGraph: public ModulePass {
 public:
-		Graph* depGraph;
+		DepGraph* depGraph;
 
 		static char ID; // Pass identification, replacement for typeid.
 		ModuleLoopControllersDepGraph() :
@@ -55,9 +55,8 @@ public:
 
         bool runOnFunction(Function& F) {
 
-        	LoopControllersDepGraph& DepGraph = getAnalysis<LoopControllersDepGraph> ();
-			Graph *g = DepGraph.depGraph;
-			g->unifyBackEdges();
+        	LoopControllersDepGraph& DepGraphPass = getAnalysis<LoopControllersDepGraph> ();
+			DepGraph *g = DepGraphPass.depGraph;
 
 
 			std::string tmp = F.getParent()->getModuleIdentifier();

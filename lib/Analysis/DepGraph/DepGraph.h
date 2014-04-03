@@ -9,14 +9,14 @@
 
 #include "llvm/Pass.h"
 #include "llvm/PassAnalysisSupport.h"
-#include "llvm/IR/Module.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Analysis/Dominators.h"
 #include "llvm/Analysis/DominanceFrontier.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/CFG.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Metadata.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/CFG.h"
 #include "llvm/Support/CallSite.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -37,12 +37,23 @@ namespace llvm {
 STATISTIC(NrOpNodes, "Number of operation nodes");
 STATISTIC(NrVarNodes, "Number of variable nodes");
 STATISTIC(NrMemNodes, "Number of memory nodes");
-STATISTIC(NrBackNodes, "Number of back nodes");
 STATISTIC(NrEdges, "Number of edges");
 
 typedef enum {
         etData = 0, etControl = 1
 } edgeType;
+
+enum NodeClassId {
+	GraphNodeId,
+	VarNodeId,
+	OpNodeId,
+	CallNodeId,
+	MemNodeId,
+	BinaryOpNodeId,
+	UnaryOpNodeId,
+	SigmaOpNodeId,
+	PHIOpNodeId
+};
 
 /*
  * Class GraphNode
@@ -117,17 +128,17 @@ public:
 class OpNode: public GraphNode {
 private:
         unsigned int OpCode;
-        Value* value;
+        Instruction* inst;
 public:
         OpNode(int OpCode) :
-                GraphNode(), OpCode(OpCode), value(NULL) {
-                this->Class_ID = 1;
+                GraphNode(), OpCode(OpCode), inst(NULL) {
+                this->Class_ID = OpNodeId;
                 NrOpNodes++;
         }
         ;
-        OpNode(int OpCode, Value* v) :
-                GraphNode(), OpCode(OpCode), value(v) {
-                this->Class_ID = 1;
+        OpNode(Instruction* i) :
+                GraphNode(), OpCode(i->getOpcode()), inst(i) {
+                this->Class_ID = OpNodeId;
                 NrOpNodes++;
         }
         ;
@@ -136,15 +147,122 @@ public:
         }
         ;
         static inline bool classof(const GraphNode *N) {
-                return N->getClass_Id() == 1 || N->getClass_Id() == 3;
+                return N->getClass_Id() == OpNodeId
+                	|| N->getClass_Id() == CallNodeId
+                	|| N->getClass_Id() == PHIOpNodeId
+                	|| N->getClass_Id() == BinaryOpNodeId
+                	|| N->getClass_Id() == UnaryOpNodeId
+                	|| N->getClass_Id() == SigmaOpNodeId;
         }
         ;
         unsigned int getOpCode() const;
         void setOpCode(unsigned int opCode);
-        Value* getValue();
+        Instruction* getOperation() {return inst;};
+
+        virtual std::string getLabel();
+        virtual std::string getShape();
+
+        GraphNode* clone();
+};
+
+
+/*
+ * Class UnaryOpNode
+ *
+ * This class represents operation nodes of llvm::UnaryInstruction instructions
+ */
+class UnaryOpNode: public OpNode {
+private:
+	Instruction* UOP;
+public:
+	UnaryOpNode(Instruction* UOP) :
+                OpNode(UOP), UOP(UOP) {
+                this->Class_ID = UnaryOpNodeId;
+        }
+        ;
+	static inline bool classof(const GraphNode *N) {
+			return N->getClass_Id() == UnaryOpNodeId
+				|| N->getClass_Id() == SigmaOpNodeId;
+	}
+	;
+
+	GraphNode* clone();
+};
+
+/*
+ * Class SigmaOpNode
+ *
+ * This class represents operation nodes of llvm::PHINode instructions that are sigma operations
+ */
+class SigmaOpNode: public UnaryOpNode {
+private:
+        PHINode* Sigma;
+public:
+        SigmaOpNode(PHINode* Sigma) :
+        		UnaryOpNode(Sigma), Sigma(Sigma) {
+                this->Class_ID = SigmaOpNodeId;
+        }
+        ;
+        static inline bool classof(const GraphNode *N) {
+                return N->getClass_Id() == SigmaOpNodeId;
+        }
+        ;
+        PHINode* getSigma() {return Sigma;};
 
         std::string getLabel();
         std::string getShape();
+        std::string getStyle();
+
+        GraphNode* clone();
+};
+
+
+/*
+ * Class PHIOpNode
+ *
+ * This class represents operation nodes of llvm::PHINode instructions
+ */
+class PHIOpNode: public OpNode {
+private:
+        PHINode* PHI;
+public:
+        PHIOpNode(PHINode* PHI) :
+                OpNode(PHI), PHI(PHI) {
+                this->Class_ID = PHIOpNodeId;
+        }
+        ;
+        static inline bool classof(const GraphNode *N) {
+                return N->getClass_Id() == PHIOpNodeId;
+        }
+        ;
+        PHINode* getPHINode() {return PHI;};
+
+        std::string getLabel();
+        std::string getShape();
+        std::string getStyle();
+
+        GraphNode* clone();
+};
+
+/*
+ * Class BinaryOpNode
+ *
+ * This class represents operation nodes of llvm::BinaryOperator instructions
+ */
+class BinaryOpNode: public OpNode {
+private:
+        BinaryOperator* BOP;
+public:
+        BinaryOpNode(BinaryOperator* BOP) :
+                OpNode(BOP), BOP(BOP) {
+                this->Class_ID = BinaryOpNodeId;
+        }
+        ;
+        static inline bool classof(const GraphNode *N) {
+                return N->getClass_Id() == BinaryOpNodeId;
+        }
+        ;
+        BinaryOperator* getBinaryOperator() {return BOP;};
 
         GraphNode* clone();
 };
@@ -160,12 +278,12 @@ private:
         CallInst* CI;
 public:
         CallNode(CallInst* CI) :
-                OpNode(Instruction::Call, CI), CI(CI) {
-                this->Class_ID = 3;
+                OpNode(CI), CI(CI) {
+                this->Class_ID = CallNodeId;
         }
         ;
         static inline bool classof(const GraphNode *N) {
-                return N->getClass_Id() == 3;
+                return N->getClass_Id() == CallNodeId;
         }
         ;
         Function* getCalledFunction() const;
@@ -190,7 +308,7 @@ private:
 public:
         VarNode(Value* value) :
                 GraphNode(), value(value) {
-                this->Class_ID = 2;
+                this->Class_ID = VarNodeId;
                 NrVarNodes++;
         }
         ;
@@ -198,7 +316,7 @@ public:
                 NrVarNodes--;
         }
         static inline bool classof(const GraphNode *N) {
-                return N->getClass_Id() == 2;
+                return N->getClass_Id() == VarNodeId;
         }
         ;
         Value* getValue();
@@ -226,7 +344,7 @@ private:
 public:
         MemNode(int aliasSetID, AliasSets *AS) :
                 aliasSetID(aliasSetID), AS(AS) {
-                this->Class_ID = 4;
+                this->Class_ID = MemNodeId;
                 NrMemNodes++;
         }
         ;
@@ -235,7 +353,7 @@ public:
         }
         ;
         static inline bool classof(const GraphNode *N) {
-                return N->getClass_Id() == 4;
+                return N->getClass_Id() == MemNodeId;
         }
         ;
         std::set<Value*> getAliases();
@@ -250,52 +368,6 @@ public:
 
 
 /*
- * Class BackNode
- *
- * This class represents nodes that explicit back edges:
- *              - It stores the ID of the AliasSet
- *              - It provides a method to get access to all the Values contained in the AliasSet
- */
-class BackNode: public GraphNode {
-private:
-	GraphNode* next;
-public:
-		BackNode(GraphNode* next) :
-			next(next) {
-                this->Class_ID = 5;
-                NrBackNodes++;
-        }
-        ;
-        ~BackNode() {
-        	NrBackNodes--;
-        }
-        ;
-        static inline bool classof(const GraphNode *N) {
-                return N->getClass_Id() == 5;
-        };
-
-
-        std::string getLabel();
-        std::string getShape();
-        GraphNode* clone();
-
-        bool operator== (BackNode &rhs){return next == rhs.next;}
-        bool operator!= (BackNode &rhs){return next != rhs.next;}
-
-        bool operator>= (BackNode &rhs){return next >= rhs.next;}
-        bool operator<= (BackNode &rhs){return next <= rhs.next;}
-
-        bool operator> (BackNode &rhs){return next > rhs.next;}
-        bool operator< (BackNode &rhs){return next < rhs.next;}
-
-		GraphNode* getNext() {
-			return next;
-		}
-};
-
-
-
-/*
  * Class Graph
  *
  * Stores a set of nodes. Each node knows how to go to other nodes.
@@ -307,7 +379,7 @@ public:
  *
  */
 //Dependence Graph
-class Graph {
+class DepGraph {
 private:
 		//Graph nodes
 		std::set<GraphNode*> nodes;							//List of nodes of the graph
@@ -315,10 +387,9 @@ private:
         llvm::DenseMap<Value*, GraphNode*> callNodes;		//Subset of opnodes
         llvm::DenseMap<Value*, GraphNode*> varNodes;		//Subset of nodes
         llvm::DenseMap<int, GraphNode*> memNodes;			//Subset of nodes
-        llvm::DenseMap<GraphNode*, BackNode*> backNodes;	//Subset of nodes
 
 		//Navigation through subgraphs
-		Graph* parentGraph;							//Graph that has originated this graph
+		DepGraph* parentGraph;							//Graph that has originated this graph
 		std::map<GraphNode*, GraphNode*> nodeMap;	//Correspondence of nodes between graphs
 
 		//Graph analysis - Strongly connected components
@@ -339,12 +410,12 @@ public:
         std::set<GraphNode*>::iterator begin();
         std::set<GraphNode*>::iterator end();
 
-        Graph(AliasSets *AS) :
+        DepGraph(AliasSets *AS) :
         	parentGraph(NULL), AS(AS){
             NrEdges = 0;
         }
         ; //Constructor
-        ~Graph(); //Destructor - Free adjacent matrix's memory
+        ~DepGraph(); //Destructor - Free adjacent matrix's memory
         GraphNode* addInst(Value *v); //Add an instruction into Dependence Graph
 
         void removeNode(GraphNode* target);
@@ -375,18 +446,18 @@ public:
         void toDot(std::string s); //print in stdErr
         void toDot(std::string s, std::string fileName); //print in a file
         void toDot(std::string s, raw_ostream *stream); //print in any stream
-        void toDot(std::string s, raw_ostream *stream, llvm::Graph::Guider* g);
+        void toDot(std::string s, raw_ostream *stream, llvm::DepGraph::Guider* g);
 
 
 
 
 
 
-        Graph makeSubGraph(std::set<GraphNode*> nodeList);
+        DepGraph makeSubGraph(std::set<GraphNode*> nodeList);
 
-        Graph generateSubGraph(Value *src, Value *dst); //Take a source value and a destination value and find a Connecting Subgraph from source to destination
-        Graph generateSubGraph(GraphNode* src, GraphNode* dst);
-        Graph generateSubGraph(int SCCID); //Generate sub graph containing only the selected SCC
+        DepGraph generateSubGraph(Value *src, Value *dst); //Take a source value and a destination value and find a Connecting Subgraph from source to destination
+        DepGraph generateSubGraph(GraphNode* src, GraphNode* dst);
+        DepGraph generateSubGraph(int SCCID); //Generate sub graph containing only the selected SCC
 
 
 
@@ -421,20 +492,14 @@ public:
         int getNumCallNodes();
         int getNumMemNodes();
         int getNumVarNodes();
-        int getNumBackNodes();
         int getNumDataEdges();
         int getNumControlEdges();
         int getNumEdges(edgeType type);
 
         std::list<GraphNode*> getNodesWithoutPredecessors();
-        std::set<std::pair<GraphNode*, GraphNode*> > getBackEdges();
 
-        void unifyBackEdges();
-        void removeBackNodes();
 
-        Graph* getParentGraph();
-
-        llvm::DenseMap<GraphNode*, BackNode*> getBackNodes() {return backNodes;};
+        DepGraph* getParentGraph();
 
         void strongconnect(GraphNode* node,
         		           std::map<GraphNode*, int> &index,
@@ -488,13 +553,13 @@ public:
         void getAnalysisUsage(AnalysisUsage &AU) const;
         bool runOnFunction(Function&);
 
-        Graph* depGraph;
+        DepGraph* depGraph;
 };
 
 /*
  * Class moduleDepGraph
  *
- * Module pass that provides a context-insensitive interprocedural dependency graph
+ * Module pass that provides a context-insensitive interprocedural dependence graph
  *
  */
 class moduleDepGraph: public ModulePass {
@@ -509,7 +574,7 @@ public:
         void matchParametersAndReturnValues(Function &F);
         void deleteCallNodes(Function* F);
 
-        Graph* depGraph;
+        DepGraph* depGraph;
 };
 
 
@@ -527,8 +592,8 @@ public:
 
         bool runOnModule(Module& M) {
 
-                moduleDepGraph& DepGraph = getAnalysis<moduleDepGraph> ();
-                Graph *g = DepGraph.depGraph;
+                moduleDepGraph& DepGraphPass = getAnalysis<moduleDepGraph> ();
+                DepGraph *graph = DepGraphPass.depGraph;
 
                 std::string tmp = M.getModuleIdentifier();
                 replace(tmp.begin(), tmp.end(), '\\', '_');
@@ -536,7 +601,7 @@ public:
                 std::string Filename = "/tmp/" + tmp + ".dot";
 
                 //Print dependency graph (in dot format)
-                g->toDot(M.getModuleIdentifier(), Filename);
+                graph->toDot(M.getModuleIdentifier(), Filename);
 
                 DisplayGraph(sys::Path(Filename), true, GraphProgram::DOT);
 

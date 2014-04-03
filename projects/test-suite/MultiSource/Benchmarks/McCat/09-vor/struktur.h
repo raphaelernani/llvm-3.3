@@ -1,6 +1,6 @@
 typedef struct point{
   int x,y;
-} point;
+} Point;
 
 typedef struct dpoint {
   double x,y;
@@ -13,7 +13,7 @@ typedef struct DCEL_segment {
 } DCEL_segment;
 
 typedef struct Knode {
-  point p;
+  Point p;
   int e1,e2,e3;
 } Knode;
 
@@ -25,7 +25,7 @@ typedef struct Enode {
 
 typedef struct splay_element {
   long key;
-  point p;
+  Point p;
 } splay_element;
 
 typedef struct splay_node {
@@ -35,7 +35,7 @@ typedef struct splay_node {
 
 typedef struct CHpoints {
   int number;
-  point node;
+  Point node;
   int v;
   struct CHpoints *next,*prev;
 } CHpoints;

@@ -43,7 +43,7 @@ void clean_up() {
 /* PROCEDURE: getpoint - Add a new vertex at the point (x,y)             */
 
 void getpoint(int x,int y) {
-  point p;
+  Point p;
 
   p.x = x;
   p.y = y;
@@ -67,7 +67,7 @@ void get_file(void) {
 /* ********************************************************************* */
 /* PROCEDURE: add_point - adds a new point to the Voronoi diagram        */
 
-void add_point(point p) {
+void add_point(Point p) {
   K[Kcount].p = p;
   K[Kcount].e1 = 0;               /* No edges make use of this point yet */
   K[Kcount].e2 = 0;
@@ -79,7 +79,7 @@ void add_point(point p) {
 /* FUNCTION: compute_v - Computes the point on the bisector between p and
              next(p) at "infinity"                                       */
 
-point compute_v(CHpoints *P) {
+Point compute_v(CHpoints *P) {
 
   /*                B
                -------------
@@ -89,15 +89,15 @@ point compute_v(CHpoints *P) {
                -------------
                     D                                                    */
   
-  point An,Bn,Cn,Dn;      /* Normalvectors to the Screen borders A,B,C,D */
-  point n;         /* Normalvector to the bisector between P and Next(p) */
+  Point An,Bn,Cn,Dn;      /* Normalvectors to the Screen borders A,B,C,D */
+  Point n;         /* Normalvector to the bisector between P and Next(p) */
   double c;       /* the constant in the equation ax+by=c, where (a,b) is 
                                              normalvector to the bisetor */
-  point i;
+  Point i;
   dpoint di; 
          /* Point where bisector of P and next(P) intersects with border */
 
-  point p,np;   
+  Point p,np;   
   double minX, minY, maxX, maxY; /* Max, min X and Y coordinate */
 
   minX=-10000.0;
@@ -304,7 +304,7 @@ void draw_sec(CHpoints *p) {
 /* PROCEDURE: alg2 - Main procedure of the algorithm                     */
 
 void alg2() {
-  point c;
+  Point c;
   dpoint dc;
   CHpoints *p,*q;  
 

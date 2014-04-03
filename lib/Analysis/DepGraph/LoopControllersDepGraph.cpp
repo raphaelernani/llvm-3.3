@@ -59,7 +59,7 @@ bool LoopControllersDepGraph::runOnFunction(Function& F){
 
     //Step 4: Remove from the graph all the nodes that are not in the list of dependencies
     std::set<GraphNode*> nodesToRemove;
-    for(Graph::iterator node = depGraph->begin(); node != depGraph->end(); node++ ){
+    for(DepGraph::iterator node = depGraph->begin(); node != depGraph->end(); node++ ){
     	if (!visitedNodes.count(*node)) nodesToRemove.insert(*node);
     }
 
@@ -91,8 +91,8 @@ void ModuleLoopControllersDepGraph::getAnalysisUsage(AnalysisUsage &AU) const{
 
 bool ModuleLoopControllersDepGraph::runOnModule(Module& M){
     //Step 1: Get the complete dependence graph
-	moduleDepGraph& DepGraph = getAnalysis<moduleDepGraph> ();
-    depGraph = DepGraph.depGraph;
+	moduleDepGraph& DepGraphPass = getAnalysis<moduleDepGraph> ();
+    depGraph = DepGraphPass.depGraph;
 
     //Step 2: Get the list of values that control the loop exits
     std::set<Value*> loopExitPredicates;
@@ -138,7 +138,7 @@ bool ModuleLoopControllersDepGraph::runOnModule(Module& M){
 
     //Step 4: Remove from the graph all the nodes that are not in the list of dependencies
     std::set<GraphNode*> nodesToRemove;
-    for(Graph::iterator node = depGraph->begin(); node != depGraph->end(); node++ ){
+    for(DepGraph::iterator node = depGraph->begin(); node != depGraph->end(); node++ ){
     	if (!visitedNodes.count(*node)) nodesToRemove.insert(*node);
     }
 

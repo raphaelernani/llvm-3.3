@@ -207,16 +207,16 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 	}
 
 	int SCCID = lcd.depGraph->getSCCID(node);
-	Graph sccGraph = lcd.depGraph->generateSubGraph(SCCID);
+	DepGraph sccGraph = lcd.depGraph->generateSubGraph(SCCID);
 
-	for(Graph::iterator it =  sccGraph.begin(); it != sccGraph.end(); it++){
+	for(DepGraph::iterator it =  sccGraph.begin(); it != sccGraph.end(); it++){
 
 		Value* V = NULL;
 
 		if (VarNode* VN = dyn_cast<VarNode>(*it)) {
 			V = VN->getValue();
 		} else	if (OpNode* ON = dyn_cast<OpNode>(*it)) {
-			V = ON->getValue();
+			V = ON->getOperation();
 		}
 
 		if (V) {
@@ -365,7 +365,7 @@ ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source
 
 	LoopInfoEx & li = getAnalysis<LoopInfoEx>();
 	LoopControllersDepGraph & lcd = getAnalysis<LoopControllersDepGraph>();
-	Graph* depGraph = lcd.depGraph;
+	DepGraph* depGraph = lcd.depGraph;
 	depGraph->recomputeSCCs();
 
 	GraphNode* sourceNode = depGraph->findNode(source);
@@ -407,7 +407,7 @@ ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source
 			}
 
 			if ( OpNode* ON = dyn_cast<OpNode>( inversePath.top() )  ) {
-				v = ON->getValue();
+				v = ON->getOperation();
 			}
 
 			if (v) {

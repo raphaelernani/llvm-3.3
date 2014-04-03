@@ -1,0 +1,612 @@
+<HTML>
+
+<HEAD>
+   <TITLE>
+      Gallery
+   </TITLE>
+</HEAD>
+
+<BODY>
+
+<H1>Gallery</H1>
+
+In this page we show some examples of programs, and the results that out range
+analysis produces for them.
+We use the following keys in the table:
+
+<UL>
+<LI>
+<STRONG>C</STRONG>: the C program that we have analyzed. This is an actual
+program, i.e., the very input to our analyzer. The comments in the program
+explain why this test is relevant.
+</LI>
+<LI>
+<STRONG>CFG-O</STRONG>: the Control Flow Graph (CFG) of the program, as
+Originally produced by LLVM without any preprocessing other than the
+conversion to SSA-form.
+</LI>
+<LI>
+<STRONG>CFG-E</STRONG>: the Control Flow Graph of the program, this time
+converted to the <I>Extended</I> Static Single Assignment (E-SSA) form.
+This intermediate representation increases the precision of our
+analysis.
+</LI>
+<LI>
+<STRONG>CG-ItP</STRONG>: the Contraint Graph (CG) produced during the
+inter-procedural range analysis. Notice that this analysis is not
+context-sensitive.
+</LI>
+<LI>
+<STRONG>CG-Inl</STRONG>: the Contraint Graph produced after we perform
+function inlining. LLVM is able to inline every non-recursive call in the
+program, so this gives us some sort of context-sensitiveness.
+</LI>
+</UL>
+
+<TABLE cellspacing="10">
+
+<TH>
+C
+</TH>
+<TH>
+CFG-O
+</TH>
+<TH>
+CFG-E
+</TH>
+<TH>
+CG-InP
+</TH>
+<TH>
+CG-Inl
+</TH>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t1.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t1.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t1.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t1.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t1.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t1.c: an example where the inter and intra-procedural analyses should return the
+same results.
+Our analysis needs some constants in the program code to narrow the intervals
+bound to each variable.
+If we do not have these constants, then there is not much that we can do.
+</TD>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t2.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t2.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t2.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t2.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t2.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t2.c: in this example the interprocedural analysis returns better results
+than the intra-procedural analysis.
+The interprocedural version can see that the function receives a constant
+as a parameter, and then it uses this information to find better intervals
+to the variables inside function foo.
+</TD>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t3.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t3.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t3.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t3.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t3.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t3.c: in this case, like in the first example, the intra and inter-procedural
+analyses return the same results.
+The input argc comes from outside the program, we we must assume that its
+interval is [-inf, +inf].
+</TD>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t4.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t4.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t4.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t4.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t4.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t4.c: this test shows how we handle comparisons between different types. These
+comparisons are implemented via truncation by the compiler. We can use the
+results of the truncate instruction to improve the bounds of some variables.
+For instance, if we cast a char into an integer, then we know that the
+resulting integer is inside [-128, +127].
+</TD>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t5.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t5.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t5.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t5.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t5.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t5.c: a second case where the inter-procedural analysis should do better than
+the intra-procedural one. In this case, we have two constant arguments that the
+inter-procedural implementation can propagate to the body of function foo.
+</TD>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t6.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t6.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t6.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t6.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t6.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t6.c: This program shows that a context-insensitive analysis loses precision.
+We get some sort of context-sensitivenss through function inlining.
+In the non-context-sensitive approach, we end up copying both parameters,
+10 and 100 to the same variable N inside the function.
+The same happens with the parameters 0 and 30.
+In the context sensitive case, we have two N's, one for each call of the
+function.
+</TD>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t7.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t7.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t7.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t7.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t7.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t7.c: a test case that shows how we handle a two-deep nested call. Again, the
+intra-procedural analysis is quite imprecise in this example. However, the
+inter-procedural implementation is able to propagate the known constant
+arguments inside the function bodies, even through multi-level function calls.
+</TD>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t8.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t8.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t8.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t8.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t8.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t8.c: this file illustrates the fact that mutually recursive functions might
+create some very large SCC's in the inter-procedural analysis. We cannot
+improve our results in this example using context sensitiveness either. The
+mutually recursivefunctions cannot be completely inlined, so, in the end, we
+must still match formal and actual parameters to at least one function call.
+</TD>
+
+<TR>
+
+<TD>
+<A HREF="srcs/t10.c" target="blank">
+<img
+    align= "center"
+    src ="../images/c.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t10.main.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cfgs/t10.essa.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/flowchart.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t10.inter.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+<A HREF="pdfs/cgs/t10.inline.pdf" target="blank">
+<img
+    align= "center"
+    src ="../images/cg.jpg"
+    ALT="Download it"
+    width=45
+>
+</A>
+</TD>
+<TD>
+t10.c: this program illustrates a situation in which an one-iteration widening
+is imprecise.
+The benchmark has a SCC with two entry-points that are phis, and single
+iteration followed by widening leads to very conservative bounds.
+Furthermore, this example shows that, dependenting on the topological ordering
+we might get different results (but still correct results anyway).
+If we start propagating intervals through one of the phi's, then we find that
+the variables are [-inf, 1].
+If we use the other, then we get [0, +inf].
+If we do one iteration before widening, then we get the least-fixed point
+[0, 1].
+</TD>
+
+</TABLE>
+
+</BODY>
+
+</HTML>

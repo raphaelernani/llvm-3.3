@@ -146,7 +146,7 @@ bool LoopStructure::runOnFunction(Function& F) {
 	LoopNormalizerAnalysis& ln = getAnalysis<LoopNormalizerAnalysis>();
 
 	LoopControllersDepGraph & lcd = getAnalysis<LoopControllersDepGraph>();
-	Graph* graph = lcd.depGraph;
+	DepGraph* graph = lcd.depGraph;
 	graph->recomputeSCCs();
 
 	LoopInfoEx & li = getAnalysis<LoopInfoEx>();

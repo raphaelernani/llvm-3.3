@@ -97,7 +97,7 @@ void free_tree(splay_node *root)
     }
 }
 
-splay_node *create_node(point p)
+splay_node *create_node(Point p)
 {
   splay_node *new_node;
   
@@ -121,7 +121,7 @@ splay_node *init(void)
   return NULL;
 }
 
-void *insert(splay_node **root, point p)
+void *insert(splay_node **root, Point p)
 {
   splay_node *temp;
   temp = create_node(p);
@@ -148,7 +148,7 @@ void *insert(splay_node **root, point p)
   *root = temp;
 }
 
-point delete_min(splay_node **root)
+Point delete_min(splay_node **root)
 {
   splay_element min_elm;
   splay_node *min_node;

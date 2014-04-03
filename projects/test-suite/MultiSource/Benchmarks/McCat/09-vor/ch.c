@@ -32,7 +32,7 @@ bool empty() {
 /* FUNCTION: point_equal - determins if the two points of the argument
    are the same                                                          */
 
-bool point_equal(point p1,point p2) {
+bool point_equal(Point p1,Point p2) {
   return  ((p1.x == p2.x) && (p1.y == p2.y)) ;
 }
 
@@ -44,7 +44,7 @@ bool point_equal(point p1,point p2) {
    which determins wether a point is left, right or on the line having
    including the segment p1p2                                            */
 
-int determinant(point p1, point p2, point p3) {
+int determinant(Point p1, Point p2, Point p3) {
   return (p1.x*(p2.y-p3.y)-p1.y*(p2.x-p3.x)+p2.x*p3.y-p2.y*p3.x);
 }
 
@@ -53,7 +53,7 @@ int determinant(point p1, point p2, point p3) {
    with a straight line, in other words, is the point p3 left/right of the 
    segment p1->p2                                                        */
 
-bool visible(int direction,point p1,point p2,point p3) {
+bool visible(int direction,Point p1,Point p2,Point p3) {
   if (direction==l) 
     return (determinant(p1,p2,p3) < 0);
   else
@@ -114,7 +114,7 @@ CHpoints *get_points_on_hull(DCEL_segment *left,DCEL_segment *right) {
 void add_segments(DCEL_segment *n,DCEL_segment *act,DCEL_segment *first,
 		  int direction) {
   DCEL_segment *k; /* the new segment */
-  point p;
+  Point p;
 
   /* p will contain the point of the segment act that doesn't touch n */
   if (point_equal(act->v1,n->v1)) 

@@ -28,12 +28,12 @@ includeAllInstsInDepGraph("includeAllInstsInDepGraph", cl::desc("Include All Ins
  */
 
 GraphNode::GraphNode() {
-        Class_ID = 0;
+        Class_ID = GraphNodeId;
         ID = currentID++;
 }
 
 GraphNode::GraphNode(GraphNode &G) {
-        Class_ID = 0;
+        Class_ID = GraphNodeId;
         ID = currentID++;
 }
 
@@ -132,11 +132,11 @@ int llvm::GraphNode::currentID = 0;
  * Class OpNode
  */
 unsigned int OpNode::getOpCode() const {
-        return OpCode;
+    return OpCode;
 }
 
 void OpNode::setOpCode(unsigned int opCode) {
-        OpCode = opCode;
+    if (!inst) OpCode = opCode;
 }
 
 std::string llvm::OpNode::getLabel() {
@@ -159,9 +159,82 @@ GraphNode* llvm::OpNode::clone() {
 
 }
 
-llvm::Value* llvm::OpNode::getValue() {
-        return value;
+/*
+ * Class PHIOpNode
+ */
+std::string llvm::PHIOpNode::getLabel() {
+        std::ostringstream stringStream;
+
+        stringStream << "PHI ";
+        if (PHI->hasName())
+                stringStream << "(" << PHI->getName().str() << ")";
+        else
+                stringStream << "(Unnamed)";
+
+        return stringStream.str();
 }
+
+std::string llvm::PHIOpNode::getShape() {
+        return std::string("octagon");
+}
+
+GraphNode* llvm::PHIOpNode::clone() {
+	PHIOpNode* R = new PHIOpNode(*this);
+	R->Class_ID = this->Class_ID;
+	return R;
+}
+
+std::string llvm::PHIOpNode::getStyle() {
+        return std::string("dashed");
+}
+
+/*
+ * Class BinaryOpNode
+ */
+GraphNode* llvm::BinaryOpNode::clone() {
+	BinaryOpNode* R = new BinaryOpNode(*this);
+	R->Class_ID = this->Class_ID;
+	return R;
+}
+
+/*
+ * Class UnaryOpNode
+ */
+GraphNode* llvm::UnaryOpNode::clone() {
+	UnaryOpNode* R = new UnaryOpNode(*this);
+	R->Class_ID = this->Class_ID;
+	return R;
+}
+
+/*
+ * Class PHIOpNode
+ */
+std::string llvm::SigmaOpNode::getLabel() {
+        std::ostringstream stringStream;
+
+        stringStream << "Sigma ";
+        if (Sigma->hasName())
+                stringStream << "(" << Sigma->getName().str() << ")";
+        else
+                stringStream << "(Unnamed)";
+
+        return stringStream.str();
+}
+
+std::string llvm::SigmaOpNode::getShape() {
+        return std::string("octagon");
+}
+
+GraphNode* llvm::SigmaOpNode::clone() {
+	SigmaOpNode* R = new SigmaOpNode(*this);
+	R->Class_ID = this->Class_ID;
+	return R;
+}
+
+std::string llvm::SigmaOpNode::getStyle() {
+        return std::string("dotted");
+}
+
 
 /*
  * Class CallNode
@@ -276,42 +349,25 @@ int llvm::MemNode::getAliasSetId() const {
 
 
 /*
- * Class BackNode
+ * Class DepGraph
  */
-GraphNode* llvm::BackNode::clone() {
-	BackNode* R = new BackNode(*this);
-    	R->Class_ID = this->Class_ID;
-    	return R;
-}
-
-std::string llvm::BackNode::getLabel() {
-	return std::string(">>");
-}
-
-std::string llvm::BackNode::getShape() {
-	return std::string("point");
-}
-
-/*
- * Class Graph
- */
-std::set<GraphNode*>::iterator Graph::begin(){
+std::set<GraphNode*>::iterator DepGraph::begin(){
 	return(nodes.begin());
 }
 
-std::set<GraphNode*>::iterator Graph::end(){
+std::set<GraphNode*>::iterator DepGraph::end(){
 	return(nodes.end());
 }
 
-Graph::~Graph() {
+DepGraph::~DepGraph() {
         nodes.clear();
 }
 
-Graph* Graph::getParentGraph(){
+DepGraph* DepGraph::getParentGraph(){
 	return parentGraph;
 }
 
-Graph Graph::generateSubGraph(Value *src, Value *dst) {
+DepGraph DepGraph::generateSubGraph(Value *src, Value *dst) {
 
         GraphNode* source = findOpNode(src);
         if (!source) source = findNode(src);
@@ -322,7 +378,7 @@ Graph Graph::generateSubGraph(Value *src, Value *dst) {
 }
 
 
-Graph Graph::generateSubGraph(GraphNode* source, GraphNode* destination) {
+DepGraph DepGraph::generateSubGraph(GraphNode* source, GraphNode* destination) {
 
 	std::set<GraphNode*> intersection;
 
@@ -348,15 +404,15 @@ Graph Graph::generateSubGraph(GraphNode* source, GraphNode* destination) {
 /*
  * SubGraph containing only the SCC
  */
-Graph Graph::generateSubGraph(int SCCID){
+DepGraph DepGraph::generateSubGraph(int SCCID){
 
 	return makeSubGraph(sCCs[SCCID]);
 
 }
 
-Graph Graph::makeSubGraph(std::set<GraphNode*> nodeList){
+DepGraph DepGraph::makeSubGraph(std::set<GraphNode*> nodeList){
 
-    Graph G(this->AS);
+    DepGraph G(this->AS);
     G.parentGraph = this;
 
     if (!nodeList.size()) return G;
@@ -391,16 +447,12 @@ Graph Graph::makeSubGraph(std::set<GraphNode*> nodeList){
             	}
 
             	if (isa<OpNode>(it->second)) {
-            		G.opNodes[dyn_cast<OpNode>(it->second)->getValue()] = dyn_cast<OpNode>(it->second);
+            		G.opNodes[dyn_cast<OpNode>(it->second)->getOperation()] = dyn_cast<OpNode>(it->second);
 
             		if (isa<CallNode>(it->second)) {
                 		G.callNodes[dyn_cast<CallNode>(it->second)->getCallInst()] = dyn_cast<CallNode>(it->second);
 
                 	}
-            	}
-
-            	if (isa<BackNode>(it->second)) {
-            		G.backNodes[dyn_cast<BackNode>(it->second)->getNext()] = dyn_cast<BackNode>(it->second);
             	}
 
             }
@@ -412,7 +464,7 @@ Graph Graph::makeSubGraph(std::set<GraphNode*> nodeList){
 
 }
 
-void Graph::dfsVisit(GraphNode* u, std::set<GraphNode*> &visitedNodes) {
+void DepGraph::dfsVisit(GraphNode* u, std::set<GraphNode*> &visitedNodes) {
 
         visitedNodes.insert(u);
 
@@ -429,7 +481,7 @@ void Graph::dfsVisit(GraphNode* u, std::set<GraphNode*> &visitedNodes) {
 
 
 
-void Graph::dfsVisitBack(GraphNode* u, std::set<GraphNode*> &visitedNodes) {
+void DepGraph::dfsVisitBack(GraphNode* u, std::set<GraphNode*> &visitedNodes) {
 
         visitedNodes.insert(u);
 
@@ -449,7 +501,7 @@ void Graph::dfsVisitBack(GraphNode* u, std::set<GraphNode*> &visitedNodes) {
 
 
 
-void Graph::dfsVisitBack_ext(GraphNode* u, std::set<GraphNode*> &visitedNodes, std::map<int, GraphNode*> &firstNodeVisitedPerSCC){
+void DepGraph::dfsVisitBack_ext(GraphNode* u, std::set<GraphNode*> &visitedNodes, std::map<int, GraphNode*> &firstNodeVisitedPerSCC){
 
     visitedNodes.insert(u);
     int SCCID = getSCCID(u);
@@ -503,14 +555,14 @@ bool lookForNestedLoop( GraphNode* first,
 }
 
 
-bool Graph::hasNestedLoop(GraphNode* first){
+bool DepGraph::hasNestedLoop(GraphNode* first){
 	std::set<GraphNode*> currentpath;
 	std::set<GraphNode*> visitedNodes;
 
 	return lookForNestedLoop( first, first, currentpath, visitedNodes);
 }
 
-bool Graph::hasNestedLoop(int SCCID){
+bool DepGraph::hasNestedLoop(int SCCID){
 	std::set<GraphNode*> SCC = getSCC(SCCID);
 	GraphNode* first = *(SCC.begin());
 	return hasNestedLoop(first);
@@ -519,13 +571,13 @@ bool Graph::hasNestedLoop(int SCCID){
 
 
 //Print the graph (.dot format) in the stderr stream.
-void Graph::toDot(std::string s) {
+void DepGraph::toDot(std::string s) {
 
         this->toDot(s, &errs());
 
 }
 
-void Graph::toDot(std::string s, const std::string fileName) {
+void DepGraph::toDot(std::string s, const std::string fileName) {
 
         std::string ErrorInfo;
 
@@ -541,7 +593,7 @@ void Graph::toDot(std::string s, const std::string fileName) {
 
 }
 
-void Graph::toDot(std::string s, raw_ostream *stream) {
+void DepGraph::toDot(std::string s, raw_ostream *stream) {
 
         (*stream) << "digraph \"DFG for \'" << s << "\' function \"{\n";
         (*stream) << "label=\"DFG for \'" << s << "\' function\";\n";
@@ -592,7 +644,7 @@ void Graph::toDot(std::string s, raw_ostream *stream) {
 
 }
 
-void llvm::Graph::toDot(std::string s, raw_ostream *stream, llvm::Graph::Guider* g) {
+void llvm::DepGraph::toDot(std::string s, raw_ostream *stream, llvm::DepGraph::Guider* g) {
         (*stream) << "digraph \"DFG for \'" << s << "\' module \"{\n";
         (*stream) << "label=\"DFG for \'" << s << "\' module\";\n";
 
@@ -620,10 +672,10 @@ void llvm::Graph::toDot(std::string s, raw_ostream *stream, llvm::Graph::Guider*
         (*stream) << "}\n\n";
 }
 
-void Graph::removeNode(GraphNode* target){
+void DepGraph::removeNode(GraphNode* target){
 
 	if (OpNode* on = dyn_cast<OpNode>(target)){
-		opNodes.erase(on->getValue());
+		opNodes.erase(on->getOperation());
 		if (CallNode* cn = dyn_cast<CallNode>(target)){
 			callNodes.erase(cn->getCallInst());
 		}
@@ -631,8 +683,6 @@ void Graph::removeNode(GraphNode* target){
 		varNodes.erase(vn->getValue());
 	} else if (MemNode* mn = dyn_cast<MemNode>(target)){
 		memNodes.erase(mn->getAliasSetId());
-	} else if (BackNode* bn = dyn_cast<BackNode>(target)){
-		backNodes.erase(bn->getNext());
 	}
 
     nodes.erase(target);
@@ -640,11 +690,22 @@ void Graph::removeNode(GraphNode* target){
 
 }
 
-GraphNode* Graph::addInst(Value *v) {
+const std::string sigmaString = "vSSA_sigma";
+
+bool isSigma(PHINode* Phi){
+	if (Phi->getName().startswith(sigmaString)
+		|| Phi->getMetadata(sigmaString) != 0
+		|| Phi->getMetadata("Sigma") != 0) return true;
+
+	return false;
+}
+
+GraphNode* DepGraph::addInst(Value *v) {
 
         GraphNode *Op, *Var, *Operand;
 
-        CallInst* CI = dyn_cast<CallInst> (v);
+        Instruction* Inst = dyn_cast<Instruction>(v);
+        CallInst* CI = dyn_cast<CallInst>(v);
         bool hasVarNode = true;
 
         if (isValidInst(v)) { //If is a data manipulator instruction
@@ -654,9 +715,9 @@ GraphNode* Graph::addInst(Value *v) {
                  * If Var is NULL, the value hasn't been processed yet, so we must process it
                  *
                  * However, if Var is a Pointer, maybe the memory node already exists but the
-                 * operation node isn't't in the graph, yet. Thus we must process it.
+                 * operation node isn't in the graph, yet. Thus we must process it.
                  */
-                if (Var == NULL || (Var != NULL && isa<Instruction> (v) && findOpNode(v) == NULL)) { //If it has not processed yet
+                if (Var == NULL || (Var != NULL && Inst != NULL && findOpNode(v) == NULL)) { //If it has not processed yet
 
                         //If Var isn't NULL, we won't create another node for it
                         if (Var == NULL) {
@@ -683,32 +744,45 @@ GraphNode* Graph::addInst(Value *v) {
 
                         }
 
-                        if (isa<Instruction> (v)) {
+                        if (Inst) {
 
-                                if (CI) {
-                                        Op = new CallNode(CI);
-                                        callNodes[CI] = Op;
-                                } else {
-                                        Op = new OpNode(dyn_cast<Instruction> (v)->getOpcode(), v);
-                                }
-                                opNodes[v] = Op;
+                            //Here we create the OpNode, according to the type of the instruction
 
-                                nodes.insert(Op);
-                                if (hasVarNode)
-                                        Op->connect(Var);
+							if (CI) {
+								Op = new CallNode(CI);
+								callNodes[CI] = Op;
+							} else if (BinaryOperator* BOP = dyn_cast<BinaryOperator>(Inst)) {
+								Op = new BinaryOpNode(BOP);
+                            } else if (UnaryInstruction* UOP = dyn_cast<UnaryInstruction>(Inst)) {
+								Op = new UnaryOpNode(UOP);
+                            } else if (PHINode* PHI = dyn_cast<PHINode>(Inst)) {
+								if (isSigma(PHI)) Op = new SigmaOpNode(PHI);
+								else Op = new PHIOpNode(PHI);
+                            } else {
+                                Op = new OpNode(Inst);
+                            }
+                            opNodes[Inst] = Op;
 
-                                //Connect the operands to the OpNode
-                                for (unsigned int i = 0; i < cast<User> (v)->getNumOperands(); i++) {
 
-                                        if (isa<StoreInst> (v) && i == 1)
-                                                continue; // We do this here because we want to represent the store instructions as a flow of information of a data to a memory node
 
-                                        Value *v1 = cast<User> (v)->getOperand(i);
-                                        Operand = this->addInst(v1);
 
-                                        if (Operand != NULL)
-                                                Operand->connect(Op);
-                                }
+
+
+							nodes.insert(Op);
+							if (hasVarNode)
+									Op->connect(Var);
+
+							//Connect the operands to the OpNode
+							for (unsigned int i = 0; i < Inst->getNumOperands(); i++) {
+
+									if (isa<StoreInst>(Inst) && i == 1)
+											continue; // We do this here because we want to represent the store instructions as a flow of information of a data to a memory node
+
+									Value *v1 = Inst->getOperand(i);
+									Operand = this->addInst(v1);
+
+									if (Operand != NULL) Operand->connect(Op);
+							}
                         }
                 }
 
@@ -717,7 +791,7 @@ GraphNode* Graph::addInst(Value *v) {
         return NULL;
 }
 
-void Graph::addEdge(GraphNode* src, GraphNode* dst, edgeType type) {
+void DepGraph::addEdge(GraphNode* src, GraphNode* dst, edgeType type) {
 
         nodes.insert(src);
         nodes.insert(dst);
@@ -726,7 +800,7 @@ void Graph::addEdge(GraphNode* src, GraphNode* dst, edgeType type) {
 }
 
 //It verify if the instruction is valid for the dependence graph, i.e. just data manipulator instructions are important for dependence graph
-bool Graph::isValidInst(Value *v) {
+bool DepGraph::isValidInst(Value *v) {
 
 	if ((!includeAllInstsInDepGraph) && isa<Instruction> (v)) {
 
@@ -747,7 +821,7 @@ bool Graph::isValidInst(Value *v) {
 
 }
 
-bool llvm::Graph::isMemoryPointer(llvm::Value* v) {
+bool llvm::DepGraph::isMemoryPointer(llvm::Value* v) {
         if (v && v->getType())
                 return v->getType()->isPointerTy();
         return false;
@@ -755,7 +829,7 @@ bool llvm::Graph::isMemoryPointer(llvm::Value* v) {
 
 //Return the pointer to the node related to the operand.
 //Return NULL if the operand is not inside map.
-GraphNode* Graph::findNode(Value *op) {
+GraphNode* DepGraph::findNode(Value *op) {
 
         if (isMemoryPointer(op)) {
                 int index = USE_ALIAS_SETS ? AS->getValueSetKey(op) : 0;
@@ -769,7 +843,7 @@ GraphNode* Graph::findNode(Value *op) {
         return NULL;
 }
 
-GraphNode* Graph::findNode(GraphNode* node) {
+GraphNode* DepGraph::findNode(GraphNode* node) {
 
 		if (nodes.count(node)) return node;
 		if (nodeMap.count(node)) return nodeMap[node];
@@ -777,7 +851,7 @@ GraphNode* Graph::findNode(GraphNode* node) {
         return NULL;
 }
 
-std::set<GraphNode*> Graph::findNodes(std::set<Value*> values) {
+std::set<GraphNode*> DepGraph::findNodes(std::set<Value*> values) {
 
         std::set<GraphNode*> result;
 
@@ -793,14 +867,14 @@ std::set<GraphNode*> Graph::findNodes(std::set<Value*> values) {
         return result;
 }
 
-OpNode* llvm::Graph::findOpNode(llvm::Value* op) {
+OpNode* llvm::DepGraph::findOpNode(llvm::Value* op) {
 
         if (opNodes.count(op))
                 return dyn_cast<OpNode> (opNodes[op]);
         return NULL;
 }
 
-void llvm::Graph::deleteCallNodes(Function* F) {
+void llvm::DepGraph::deleteCallNodes(Function* F) {
 
         for (Value::use_iterator UI = F->use_begin(), E = F->use_end(); UI != E; ++UI) {
                 User *U = *UI;
@@ -830,7 +904,7 @@ void llvm::Graph::deleteCallNodes(Function* F) {
 
 }
 
-std::pair<GraphNode*, int> llvm::Graph::getNearestDependency(llvm::Value* sink,
+std::pair<GraphNode*, int> llvm::DepGraph::getNearestDependency(llvm::Value* sink,
                 std::set<llvm::Value*> sources, bool skipMemoryNodes) {
 
         std::pair<llvm::GraphNode*, int> result;
@@ -903,7 +977,7 @@ std::pair<GraphNode*, int> llvm::Graph::getNearestDependency(llvm::Value* sink,
         return result;
 }
 
-std::map<GraphNode*, std::vector<GraphNode*> > llvm::Graph::getEveryDependency(
+std::map<GraphNode*, std::vector<GraphNode*> > llvm::DepGraph::getEveryDependency(
                 llvm::Value* sink, std::set<llvm::Value*> sources, bool skipMemoryNodes) {
 
         std::map<llvm::GraphNode*, std::vector<GraphNode*> > result;
@@ -971,27 +1045,23 @@ std::map<GraphNode*, std::vector<GraphNode*> > llvm::Graph::getEveryDependency(
 }
 
 
-int llvm::Graph::getNumOpNodes() {
+int llvm::DepGraph::getNumOpNodes() {
 	return opNodes.size();
 }
 
-int llvm::Graph::getNumCallNodes() {
+int llvm::DepGraph::getNumCallNodes() {
 	return callNodes.size();
 }
 
-int llvm::Graph::getNumMemNodes() {
+int llvm::DepGraph::getNumMemNodes() {
 	return memNodes.size();
 }
 
-int llvm::Graph::getNumVarNodes() {
+int llvm::DepGraph::getNumVarNodes() {
 	return varNodes.size();
 }
 
-int llvm::Graph::getNumBackNodes(){
-	return backNodes.size();
-}
-
-int llvm::Graph::getNumEdges(edgeType type){
+int llvm::DepGraph::getNumEdges(edgeType type){
 
 	int result = 0;
 
@@ -1013,15 +1083,15 @@ int llvm::Graph::getNumEdges(edgeType type){
 
 }
 
-int llvm::Graph::getNumDataEdges() {
+int llvm::DepGraph::getNumDataEdges() {
 	return getNumEdges(etData);
 }
 
-int llvm::Graph::getNumControlEdges() {
+int llvm::DepGraph::getNumControlEdges() {
 	return getNumEdges(etControl);
 }
 
-std::list<GraphNode*> llvm::Graph::getNodesWithoutPredecessors() {
+std::list<GraphNode*> llvm::DepGraph::getNodesWithoutPredecessors() {
 
 	std::list<GraphNode*> result;
 
@@ -1037,86 +1107,15 @@ std::list<GraphNode*> llvm::Graph::getNodesWithoutPredecessors() {
 
 }
 
-void llvm::Graph::removeEdge(GraphNode* src, GraphNode* dst) {
+void llvm::DepGraph::removeEdge(GraphNode* src, GraphNode* dst) {
 
 	src->disconnect(dst);
 
 }
 
-void llvm::Graph::removeBackNodes(){
-
-	for (llvm::DenseMap<GraphNode*, BackNode*>::iterator it = backNodes.begin(); it != backNodes.end(); it++){
-
-		std::map<GraphNode*, edgeType> predecessors = it->second->getPredecessors();
-		std::map<GraphNode*, edgeType>::iterator pred = predecessors.begin(), s_end = predecessors.end();
-		for (; pred != s_end; pred++) {
-
-			pred->first->connect(it->first, pred->second);
-
-		}
-
-		nodes.erase(it->second);
-
-		delete it->second;
-
-	}
 
 
-	backNodes.clear();
-
-}
-
-void llvm::Graph::unifyBackEdges() {
-
-	if (backNodes.size()) removeBackNodes();
-
-	std::set<std::pair<GraphNode*, GraphNode*> > backEdges = getBackEdges();
-
-	for (std::set<std::pair<GraphNode*, GraphNode*> >::iterator backEdge = backEdges.begin();
-			backEdge != backEdges.end(); backEdge++){
-
-		removeEdge(backEdge->first, backEdge->second);
-
-		BackNode* backNode;
-
-		if(!backNodes.count(backEdge->second)){
-
-			backNode = new BackNode(backEdge->second);
-			nodes.insert(backNode);
-			backNodes[backEdge->second] = backNode;
-
-//			sCCs[getSCCID(backEdge->second)].insert(backNode);
-//			reverseSCCMap[backNode] = getSCCID(backEdge->second);
-
-			backNode->connect(backEdge->second);
-
-		} else {
-			backNode = backNodes[backEdge->second];
-		}
-
-		backEdge->first->connect(backNode);
-
-	}
-
-	recomputeSCCs();
-
-}
-
-std::set<std::pair<GraphNode*, GraphNode*> > llvm::Graph::getBackEdges(){
-
-	std::set<std::pair<GraphNode*, GraphNode*> > result;
-
-	/*
-	 * TODO: Check if this method is really necessary and if so, implement it
-	 */
-	errs() << "Implement getBackEdges!\n";
-
-	return result;
-
-}
-
-
-void llvm::Graph::strongconnect(GraphNode* node,
+void llvm::DepGraph::strongconnect(GraphNode* node,
 		           std::map<GraphNode*, int> &index,
 		           std::map<GraphNode*, int> &lowlink,
 		           int &currentIndex,
@@ -1169,7 +1168,7 @@ void llvm::Graph::strongconnect(GraphNode* node,
 }
 
 //SCC definition using the Tarjan's algorithm
-void llvm::Graph::recomputeSCCs(){
+void llvm::DepGraph::recomputeSCCs(){
 
 	sCCs.clear();
 	reverseSCCMap.clear();
@@ -1192,7 +1191,7 @@ void llvm::Graph::recomputeSCCs(){
 
 }
 
-void llvm::Graph::dumpSCCs(){
+void llvm::DepGraph::dumpSCCs(){
 
 	errs() << "\nSCCs\n";
 	for(std::map<int, std::set<GraphNode*> >::iterator it = sCCs.begin(); it != sCCs.end(); it++){
@@ -1206,7 +1205,7 @@ void llvm::Graph::dumpSCCs(){
 
 }
 
-std::map<int, std::set<GraphNode*> > llvm::Graph::getSCCs(){
+std::map<int, std::set<GraphNode*> > llvm::DepGraph::getSCCs(){
 
 	if(!sCCs.size()) {
 
@@ -1216,7 +1215,7 @@ std::map<int, std::set<GraphNode*> > llvm::Graph::getSCCs(){
 	return sCCs;
 }
 
-std::list<int> llvm::Graph::getSCCTopologicalOrder(){
+std::list<int> llvm::DepGraph::getSCCTopologicalOrder(){
 
 	if (!topologicalOrderedSCCs.size()) {
 
@@ -1278,7 +1277,7 @@ std::list<int> llvm::Graph::getSCCTopologicalOrder(){
 	return topologicalOrderedSCCs;
 }
 
-int llvm::Graph::getSCCID(GraphNode* node) {
+int llvm::DepGraph::getSCCID(GraphNode* node) {
 
 	if(!sCCs.size()) {
 
@@ -1298,7 +1297,7 @@ int llvm::Graph::getSCCID(GraphNode* node) {
 
 }
 
-std::set<GraphNode*> llvm::Graph::getSCC(int ID) {
+std::set<GraphNode*> llvm::DepGraph::getSCC(int ID) {
 
 	if(!sCCs.size()) {
 
@@ -1325,7 +1324,7 @@ std::set<GraphNode*> llvm::Graph::getSCC(int ID) {
  * This method implements a modified breadth-first search to collect the
  * paths using a backtracking strategy
  */
-void llvm::Graph::getAcyclicPaths_rec(
+void llvm::DepGraph::getAcyclicPaths_rec(
 		                 GraphNode* dst,
 		                 std::set<GraphNode*> &visitedNodes,
 		                 std::stack<GraphNode*> &path,
@@ -1385,7 +1384,7 @@ void llvm::Graph::getAcyclicPaths_rec(
 }
 
 
-std::set<std::stack<GraphNode*> > llvm::Graph::getAcyclicPaths(GraphNode* src,
+std::set<std::stack<GraphNode*> > llvm::DepGraph::getAcyclicPaths(GraphNode* src,
 		GraphNode* dst) {
 
 	std::set<std::stack<GraphNode*> > result;
@@ -1404,7 +1403,7 @@ std::set<std::stack<GraphNode*> > llvm::Graph::getAcyclicPaths(GraphNode* src,
 }
 
 
-std::set<std::stack<GraphNode*> > llvm::Graph::getAcyclicPathsInsideSCC(GraphNode* src, GraphNode* dst){
+std::set<std::stack<GraphNode*> > llvm::DepGraph::getAcyclicPathsInsideSCC(GraphNode* src, GraphNode* dst){
 
 
 	std::set<std::stack<GraphNode*> > result;
@@ -1422,7 +1421,7 @@ std::set<std::stack<GraphNode*> > llvm::Graph::getAcyclicPathsInsideSCC(GraphNod
 	return result;
 }
 
-bool Graph::acyclicPathExists(GraphNode* src,
+bool DepGraph::acyclicPathExists(GraphNode* src,
 		GraphNode* dst,
         std::set<GraphNode*> visitedNodes,
         int SCCID){
@@ -1496,7 +1495,7 @@ bool functionDepGraph::runOnFunction(Function &F) {
                 AS = &(getAnalysis<AliasSets> ());
 
         //Making dependency graph
-        depGraph = new Graph(AS);
+        depGraph = new DepGraph(AS);
         //Insert instructions in the graph
         for (Function::iterator BBit = F.begin(), BBend = F.end(); BBit != BBend; ++BBit) {
                 for (BasicBlock::iterator Iit = BBit->begin(), Iend = BBit->end(); Iit
@@ -1530,7 +1529,7 @@ bool moduleDepGraph::runOnModule(Module &M) {
                 AS = &(getAnalysis<AliasSets> ());
 
         //Making dependency graph
-        depGraph = new Graph(AS);
+        depGraph = new DepGraph(AS);
 
         //Insert instructions in the graph
         for (Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; ++Fit) {
@@ -1671,25 +1670,25 @@ void llvm::moduleDepGraph::deleteCallNodes(Function* F) {
         depGraph->deleteCallNodes(F);
 }
 
-void llvm::Graph::Guider::setNodeAttrs(GraphNode* n, std::string attrs) {
+void llvm::DepGraph::Guider::setNodeAttrs(GraphNode* n, std::string attrs) {
         nodeAttrs[n] = attrs;
 }
 
-void llvm::Graph::Guider::setEdgeAttrs(GraphNode* u, GraphNode* v,
+void llvm::DepGraph::Guider::setEdgeAttrs(GraphNode* u, GraphNode* v,
                 std::string attrs) {
         edgeAttrs[std::pair<GraphNode*, GraphNode*>(u, v)] = attrs;
 }
 
-void llvm::Graph::Guider::clear() {
+void llvm::DepGraph::Guider::clear() {
         nodeAttrs.clear();
         edgeAttrs.clear();
 }
 
-std::string llvm::Graph::Guider::getNodeAttrs(GraphNode* n) {
+std::string llvm::DepGraph::Guider::getNodeAttrs(GraphNode* n) {
         return nodeAttrs[n];
 }
 
-std::string llvm::Graph::Guider::getEdgeAttrs(GraphNode* u, GraphNode* v) {
+std::string llvm::DepGraph::Guider::getEdgeAttrs(GraphNode* u, GraphNode* v) {
         return edgeAttrs[std::pair<GraphNode*, GraphNode*>(u, v)];
 }
 
