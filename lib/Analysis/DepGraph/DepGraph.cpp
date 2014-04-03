@@ -410,6 +410,23 @@ DepGraph DepGraph::generateSubGraph(int SCCID){
 
 }
 
+//Creates an entirely new graph, with equivalent nodes and edges
+DepGraph* DepGraph::clone(){
+
+
+	DepGraph* result;
+
+	result = new DepGraph(AS); //Somebody has to free this memory at some point in the future
+	*result = makeSubGraph(nodes);
+	result->parentGraph = NULL;  //Make the graphs independent
+
+	result->sCCs.clear();
+	result->reverseSCCMap.clear();
+
+	return result;
+
+}
+
 DepGraph DepGraph::makeSubGraph(std::set<GraphNode*> nodeList){
 
     DepGraph G(this->AS);

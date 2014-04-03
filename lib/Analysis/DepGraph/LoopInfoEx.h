@@ -20,6 +20,7 @@
 
 #include "llvm/Analysis/LoopInfo.h"
 #include <vector>
+#include <set>
 #include <stack>
 
 using namespace std;
@@ -137,6 +138,8 @@ public:
 		iterator result(LoopInfo::end(), LoopInfo::end());
 		return result;
 	}
+
+	std::set<Loop*> getNestedLoops(Loop*);
 
 };
 

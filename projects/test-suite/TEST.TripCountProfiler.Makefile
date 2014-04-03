@@ -20,10 +20,10 @@ REPORTS_SUFFIX := $(addsuffix .report.txt, $(REPORTS_TO_GEN))
 $(PROGRAMS_TO_TEST:%=Output/%.linked.rbc.instr.bc):  \
 Output/%.linked.rbc.instr.bc: Output/%.linked.rbc $(LOPT)
 	@-$(LOPT) -mem2reg -break-crit-edges -instnamer -stats -time-passes \
-		-load SymbolicRA.so -load DepGraph.so  $(TCFLAGS) -loop-normalizer -tc-generator -tc-profiler -O2 $< -o $<.tmp \
+		-load SymbolicRA.so -load DepGraph.so  $(TCFLAGS) -loop-normalizer -tc-generator -tc-profiler $< -o $<.tmp \
 		2>Output/$*.instrumentation.stats
-	clang -S -emit-llvm $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.c -o $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc
-	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.linked.rbc.instr.bc.info llvm-link $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc $<.tmp -o=$@
+	clang++ -S -emit-llvm $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.cpp -o $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc
+	$(RUNSAFELY) /dev/null Output/$*.linked.rbc.instr.bc.info llvm-link $(PROGDIR)/InstrumentationLibrariesToLink/TcProfilerLinkedLibrary.bc $<.tmp -o=$@
 
 
 #Output of the Instrumentation step
@@ -53,7 +53,7 @@ ifdef TEST_INTEGRATED_ASSEMBLER
 # Link an LLVM-linked program using the system linker.
 $(PROGRAMS_TO_TEST:%=Output/%.llc-instr): \
 Output/%.llc-instr: Output/%.llc-instr.o
-	-$(PROGRAMLD) $< -o $@ $(LLCLIBS) $(LLCASSEMBLERFLAGS) $(X_TARGET_FLAGS) $(LDFLAGS)
+	-$(CXX) $< -o $@ $(LLCLIBS) $(LLCASSEMBLERFLAGS) $(X_TARGET_FLAGS) $(LDFLAGS)
 
 else
 
@@ -61,7 +61,7 @@ else
 #
 $(PROGRAMS_TO_TEST:%=Output/%.llc-instr): \
 Output/%.llc-instr: Output/%.llc-instr.s
-	-$(PROGRAMLD) $< -o $@ $(LLCLIBS) $(LLCASSEMBLERFLAGS) $(X_TARGET_FLAGS) $(LDFLAGS)
+	-$(CXX) $< -o $@ $(LLCLIBS) $(LLCASSEMBLERFLAGS) $(X_TARGET_FLAGS) $(LDFLAGS)
 	
 endif
 
@@ -70,8 +70,8 @@ $(PROGRAMS_TO_TEST:%=Output/%.out-llc-instr): \
 Output/%.out-llc-instr: Output/%.llc-instr
 	$(VERB) $(RM) -f loops.out
 	$(RUNSAFELY) $(STDIN_FILENAME) $@ $< $(RUN_OPTIONS) 
-	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.loops.out.info mv loops.out Output/$*.loops.out
-	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.out-llc-instr-loops /bin/bash $(PROCESSLOOPS) Output/$*.loops.out 
+	$(RUNSAFELY) /dev/null Output/$*.loops.out.info mv loops.out Output/$*.loops.out
+	$(RUNSAFELY) /dev/null Output/$*.out-llc-instr-loops /bin/bash $(PROCESSLOOPS) Output/$*.loops.out 
 ifdef PROGRAM_OUTPUT_FILTER
 	$(PROGRAM_OUTPUT_FILTER) $@
 endif
@@ -112,6 +112,9 @@ $(PROGRAMS_TO_TEST:%=Output/%.nightly.instr.report.txt): \
 Output/%.nightly.instr.report.txt: Output/%.exe-llc-instr Output/%.out-llc-instr-loops Output/%.loops.out Output/%.instrumentation.stats
 	$(VERB) $(RM) -f $@	
 	@echo > $@
+	@-if test -f Output/$*.instrumentation.stats; then \
+	  cat Output/$*.instrumentation.stats >> $@;\
+	fi
 	@-if test -f Output/$*.exe-llc-instr; then \
 	  head -n 100 Output/$*.exe-llc-instr >> $@; \
 	  echo "TEST-PASS: instr $(RELDIR)/$*" >> $@;\
@@ -121,8 +124,6 @@ Output/%.nightly.instr.report.txt: Output/%.exe-llc-instr Output/%.out-llc-instr
 	  grep "^user" Output/$*.out-llc-instr.time >> $@;\
 	  echo >> $@;\
 	  cat Output/$*.out-llc-instr-loops >> $@;\
-	  echo >> $@;\
-	  cat Output/$*.instrumentation.stats >> $@;\
 	else  \
 	  echo "TEST-FAIL: instr $(RELDIR)/$*" >> $@;\
 	fi

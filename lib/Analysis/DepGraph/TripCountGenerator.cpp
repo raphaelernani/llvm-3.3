@@ -197,7 +197,9 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 	Loop* loop = li.getLoopFor(loopHeader);
 
 	//Option 1: Loop invariant. Return the value itself
-	if (loop->isLoopInvariant(source)) return source;
+	if (loop->isLoopInvariant(source)) {
+		return source;
+	}
 
 	//Option 2: Sequence of redefinitions with PHI node in the loop header. Return the incoming value from the entry block
 	LoopControllersDepGraph& lcd = getAnalysis<LoopControllersDepGraph>();
@@ -207,6 +209,7 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 	}
 
 	int SCCID = lcd.depGraph->getSCCID(node);
+
 	DepGraph sccGraph = lcd.depGraph->generateSubGraph(SCCID);
 
 	for(DepGraph::iterator it =  sccGraph.begin(); it != sccGraph.end(); it++){
@@ -296,6 +299,7 @@ Value* TripCountGenerator::getValueAtEntryPoint(Value* source, BasicBlock* loopH
 		return NEW_INST;
 	}
 
+
 	//Option 9999: unknown. Return NULL
 	return NULL;
 }
@@ -375,7 +379,7 @@ ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source
 
 	std::set<std::stack<GraphNode*> > paths = depGraph->getAcyclicPathsInsideSCC(sourceNode, sourceNode);
 
-	//When a value has no cycle (single-node SCC) we must give a force and create an artificial cycle that
+	//When a value has no cycle (single-node SCC) we must create an artificial cycle that
 	//produces a vector with length zero
 	if (!paths.size()) {
 		std::stack<GraphNode*> forcedPath;
@@ -431,9 +435,25 @@ ProgressVector* TripCountGenerator::generateConstantProgressVector(Value* source
 		ProgressVector* currentPathVector = new ProgressVector(path);
 		Value* currentVectorValue = currentPathVector->getUniqueValue(Type::getInt64Ty(*context));
 
+
 		bool fail = false;
 
 		if (currentVectorValue) {
+
+			if (currentVectorValue->getName().equals("add97")){
+				errs() << "Achei!\n";
+
+				errs() << "Source: " << *source << "\n";
+				if(Instruction* I = dyn_cast<Instruction>(source)){
+					errs() << *(I->getParent())  << "\n\n";
+				}
+
+
+				errs() << *loopHeader;
+
+
+			}
+
 
 			if (li.getLoopFor(loopHeader)->isLoopInvariant(currentVectorValue)) {
 
@@ -668,6 +688,8 @@ void llvm::TripCountGenerator::generateHybridEstimatedTripCounts(Function& F) {
 
 	for(LoopInfoEx::iterator lit = li.begin(); lit != li.end(); lit++){
 
+
+
 		//Indicates if we don't have ways to determine the trip count
 		bool unknownTC = false;
 
@@ -675,6 +697,10 @@ void llvm::TripCountGenerator::generateHybridEstimatedTripCounts(Function& F) {
 
 		BasicBlock* header = loop->getHeader();
 		BasicBlock* entryBlock = ln.entryBlocks[header];
+
+
+		LoopControllersDepGraph& lcd = getAnalysis<LoopControllersDepGraph>();
+		lcd.setPerspective(header);
 
 		/*
 		 * Here we are looking for the predicate that stops the loop.
@@ -708,6 +734,8 @@ void llvm::TripCountGenerator::generateHybridEstimatedTripCounts(Function& F) {
 			Op2 = getValueAtEntryPoint(CI->getOperand(1), header);
 
 
+
+
 			if((!Op1) || (!Op2) ) {
 
 				if (!LoopClass) NumUnknownConditionsIL++;
@@ -715,7 +743,6 @@ void llvm::TripCountGenerator::generateHybridEstimatedTripCounts(Function& F) {
 
 				unknownTC = true;
 			} else {
-
 
 				if (!(Op1->getType()->isIntegerTy() && Op2->getType()->isIntegerTy())) {
 					//We only handle loop conditions that compares integer variables
@@ -836,6 +863,9 @@ void TripCountGenerator::generatePericlesEstimatedTripCounts(Function &F){
 		BasicBlock* header = loop->getHeader();
 		BasicBlock* entryBlock = ln.entryBlocks[header];
 
+		LoopControllersDepGraph& lcd = getAnalysis<LoopControllersDepGraph>();
+		lcd.setPerspective(header);
+
 		/*
 		 * Here we are looking for the predicate that stops the loop.
 		 *
@@ -922,6 +952,9 @@ void TripCountGenerator::generateVectorEstimatedTripCounts(Function &F){
 
 		BasicBlock* header = loop->getHeader();
 		BasicBlock* entryBlock = ln.entryBlocks[header];
+
+		LoopControllersDepGraph& lcd = getAnalysis<LoopControllersDepGraph>();
+		lcd.setPerspective(header);
 
 		/*
 		 * Here we are looking for the predicate that stops the loop.

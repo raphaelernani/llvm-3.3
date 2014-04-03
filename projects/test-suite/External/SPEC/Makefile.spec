@@ -144,8 +144,8 @@ Output/%.out-llc-instr: Output/%.llc-instr
 	$(VERB) $(RM) -f Output/llc-instr-$(RUN_TYPE)/loops.out
 	$(SPEC_SANDBOX) llc-instr-$(RUN_TYPE) $@ $(REF_IN_DIR) $(RUNSAFELY) $(STDIN_FILENAME) $(STDOUT_FILENAME) ../$*.llc-instr $(RUN_OPTIONS)
 	echo $(CURDIR)
-	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.loops.out.info mv Output/llc-instr-$(RUN_TYPE)/loops.out Output/$*.loops.out 
-	$(RUNSAFELY) $(STDIN_FILENAME) Output/$*.out-llc-instr-loops /bin/bash $(PROCESSLOOPS) Output/$*.loops.out               
+	$(RUNSAFELY) /dev/null Output/$*.loops.out.info mv Output/llc-instr-$(RUN_TYPE)/loops.out Output/$*.loops.out 
+	$(RUNSAFELY) /dev/null Output/$*.out-llc-instr-loops /bin/bash $(PROCESSLOOPS) Output/$*.loops.out               
 	-(cd Output/llc-instr-$(RUN_TYPE); cat $(LOCAL_OUTPUTS)) | \
 	  $(SPEC_OUTPUT_FILE_FILTER) > $@
 	cp Output/llc-instr-$(RUN_TYPE)/$(STDOUT_FILENAME).time $@.time

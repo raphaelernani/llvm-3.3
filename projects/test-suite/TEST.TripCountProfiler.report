@@ -94,6 +94,7 @@ $HilightColumns{9} = 1;
  ["NumUnknownTripCount"             , '([0-9]+).*Number of Unknown Estimated Trip Count'],
  [],  
 # Accuracy - NumLoops
+ ["NumLoops - IL UNK"               , 'NumLoops \(Interval Loops, Unknown\)\s*([0-9]+)'],
  ["NumLoops - IL G0"                , 'NumLoops \(Interval Loops, Group 0\)\s*([0-9]+)'],
  ["NumLoops - IL G1"                , 'NumLoops \(Interval Loops, Group 1\)\s*([0-9]+)'],
  ["NumLoops - IL G2"                , 'NumLoops \(Interval Loops, Group 2\)\s*([0-9]+)'],
@@ -101,6 +102,7 @@ $HilightColumns{9} = 1;
  ["NumLoops - IL G4"                , 'NumLoops \(Interval Loops, Group 4\)\s*([0-9]+)'],
  ["NumLoops - IL G5"                , 'NumLoops \(Interval Loops, Group 5\)\s*([0-9]+)'],
  ["NumLoops - IL G6"                , 'NumLoops \(Interval Loops, Group 6\)\s*([0-9]+)'],      
+ ["NumLoops - EL UNK"               , 'NumLoops \(Equality Loops, Unknown\)\s*([0-9]+)'],
  ["NumLoops - EL G0"                , 'NumLoops \(Equality Loops, Group 0\)\s*([0-9]+)'],
  ["NumLoops - EL G1"                , 'NumLoops \(Equality Loops, Group 1\)\s*([0-9]+)'],
  ["NumLoops - EL G2"                , 'NumLoops \(Equality Loops, Group 2\)\s*([0-9]+)'],
@@ -118,6 +120,7 @@ $HilightColumns{9} = 1;
  ["NumLoops - All"                  , 'NumLoops \(All Loops\)\s*([.0-9]+)'],
  [],  
 # Accuracy - NumInstances
+ ["NumInstances - IL UNK"               , 'NumInstances \(Interval Loops, Unknown\)\s*([0-9]+)'],
  ["NumInstances - IL G0"                , 'NumInstances \(Interval Loops, Group 0\)\s*([0-9]+)'],
  ["NumInstances - IL G1"                , 'NumInstances \(Interval Loops, Group 1\)\s*([0-9]+)'],
  ["NumInstances - IL G2"                , 'NumInstances \(Interval Loops, Group 2\)\s*([0-9]+)'],
@@ -125,6 +128,7 @@ $HilightColumns{9} = 1;
  ["NumInstances - IL G4"                , 'NumInstances \(Interval Loops, Group 4\)\s*([0-9]+)'],
  ["NumInstances - IL G5"                , 'NumInstances \(Interval Loops, Group 5\)\s*([0-9]+)'],
  ["NumInstances - IL G6"                , 'NumInstances \(Interval Loops, Group 6\)\s*([0-9]+)'],      
+ ["NumInstances - EL UNK"               , 'NumInstances \(Equality Loops, Unknown\)\s*([0-9]+)'],
  ["NumInstances - EL G0"                , 'NumInstances \(Equality Loops, Group 0\)\s*([0-9]+)'],
  ["NumInstances - EL G1"                , 'NumInstances \(Equality Loops, Group 1\)\s*([0-9]+)'],
  ["NumInstances - EL G2"                , 'NumInstances \(Equality Loops, Group 2\)\s*([0-9]+)'],

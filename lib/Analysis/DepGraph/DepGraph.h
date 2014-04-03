@@ -450,8 +450,8 @@ public:
 
 
 
-
-
+        //Creates an entirely new graph, with equivalent nodes and edges
+        DepGraph* clone();
 
         DepGraph makeSubGraph(std::set<GraphNode*> nodeList);
 
