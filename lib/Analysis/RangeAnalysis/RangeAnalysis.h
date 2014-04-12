@@ -9,6 +9,7 @@
 #define RANGEANALYSIS_H_
 
 #include "../DepGraph/DepGraph.h"
+#include "Range.h"
 
 
 namespace llvm {

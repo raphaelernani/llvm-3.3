@@ -7,6 +7,14 @@
 
 #include "Range.h"
 
+// The number of bits needed to store the largest variable of the function (APInt).
+unsigned MAX_BIT_INT = 1;
+
+// The min and max integer values for a given bit width.
+APInt Min = APInt::getSignedMinValue(MAX_BIT_INT);
+APInt Max = APInt::getSignedMaxValue(MAX_BIT_INT);
+APInt Zero(MAX_BIT_INT, 0, true);
+
 
 // ========================================================================== //
 // Range

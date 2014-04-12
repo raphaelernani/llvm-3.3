@@ -9,7 +9,10 @@
 #ifndef RANGE_H_
 #define RANGE_H_
 
+#include "llvm/Pass.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/IR/Argument.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -29,6 +32,16 @@ using namespace llvm;
 /// considering the ranges symbolically, letting them wrap around,
 /// as ConstantRange considers, but it would require big changes
 /// in our algorithm.
+
+
+// The number of bits needed to store the largest variable of the function (APInt).
+extern unsigned MAX_BIT_INT;
+
+// The min and max integer values for a given bit width.
+extern APInt Min;
+extern APInt Max;
+extern APInt Zero;
+
 
 enum RangeType {Unknown, Regular, Empty};
 

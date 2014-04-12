@@ -5,9 +5,16 @@
  *      Author: raphael
  */
 
+#ifndef DEBUG_TYPE
+#define DEBUG_TYPE "BranchAnalysis"
+#endif
+
 #include "BranchAnalysis.h"
 
 using namespace llvm;
+
+STATISTIC(numBranchesAnalyzed,"Number of Conditional Branches Analyzed");
+STATISTIC(numSwitchesAnalyzed,"Number of Switches Analyzed");
 
 void BranchAnalysis::buildValueSwitchMap(const SwitchInst *sw) {
 	const Value *condition = sw->getCondition();
@@ -17,6 +24,8 @@ void BranchAnalysis::buildValueSwitchMap(const SwitchInst *sw) {
 	if (!opType->isIntegerTy()) {
 		return;
 	}
+
+	numSwitchesAnalyzed++;
 
 	SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4> BBsuccs;
 
@@ -74,11 +83,14 @@ void BranchAnalysis::buildValueSwitchMap(const SwitchInst *sw) {
 
 
 	ValueSwitchMap VSM(condition, BBsuccs);
-	valuesSwitchMap.insert(std::make_pair(condition, VSM));
+	//valuesSwitchMap.insert(std::make_pair(condition, VSM));
+
+	IntervalConstraints[condition].push_back(VSM);
+
 
 	if (Op0_0) {
 		ValueSwitchMap VSM_0(Op0_0, BBsuccs);
-		valuesSwitchMap.insert(std::make_pair(Op0_0, VSM_0));
+		IntervalConstraints[Op0_0].push_back(VSM_0);
 	}
 }
 
@@ -97,9 +109,7 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		return;
 	}
 
-	// Create VarNodes for comparison operands explicitly (need to do this when inlining is used!)
-	addVarNode(ici->getOperand(0));
-	addVarNode(ici->getOperand(1));
+	numBranchesAnalyzed++;
 
 	// Gets the successors of the current basic block.
 	const BasicBlock *TBlock = br->getSuccessor(0);
@@ -152,7 +162,9 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 
 		const Value *Op0 = ici->getOperand(0);
 		ValueBranchMap VBM(Op0, TBlock, FBlock, BT, BF);
-		valuesBranchMap.insert(std::make_pair(Op0, VBM));
+
+		IntervalConstraints[Op0].push_back(VBM);
+		//valuesBranchMap.insert(std::make_pair(Op0, VBM));
 
 		// Do the same for the operand of Op0 (if Op0 is a cast instruction)
 		const CastInst *castinst = NULL;
@@ -163,7 +175,9 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 			BasicInterval* BF = new BasicInterval(FValues);
 
 			ValueBranchMap VBM(Op0_0, TBlock, FBlock, BT, BF);
-			valuesBranchMap.insert(std::make_pair(Op0_0, VBM));
+
+			IntervalConstraints[Op0_0].push_back(VBM);
+			//valuesBranchMap.insert(std::make_pair(Op0_0, VBM));
 		}
 	} else {
 		// Create the interval using the intersection in the branch.
@@ -180,7 +194,8 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		SymbInterval* SFOp0 = new SymbInterval(CR, Op1, invPred);
 
 		ValueBranchMap VBMOp0(Op0, TBlock, FBlock, STOp0, SFOp0);
-		valuesBranchMap.insert(std::make_pair(Op0, VBMOp0));
+		IntervalConstraints[Op0].push_back(VBMOp0);
+		//valuesBranchMap.insert(std::make_pair(Op0, VBMOp0));
 
 		// Symbolic intervals for operand of op0 (if op0 is a cast instruction)
 		const CastInst *castinst = NULL;
@@ -191,14 +206,16 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 			SymbInterval* SFOp1_1 = new SymbInterval(CR, Op1, invPred);
 
 			ValueBranchMap VBMOp1_1(Op0_0, TBlock, FBlock, STOp1_1, SFOp1_1);
-			valuesBranchMap.insert(std::make_pair(Op0_0, VBMOp1_1));
+			IntervalConstraints[Op0_0].push_back(VBMOp1_1);
+			//valuesBranchMap.insert(std::make_pair(Op0_0, VBMOp1_1));
 		}
 
 		// Symbolic intervals for op1
 		SymbInterval* STOp1 = new SymbInterval(CR, Op0, invPred);
 		SymbInterval* SFOp1 = new SymbInterval(CR, Op0, pred);
 		ValueBranchMap VBMOp1(Op1, TBlock, FBlock, STOp1, SFOp1);
-		valuesBranchMap.insert(std::make_pair(Op1, VBMOp1));
+		IntervalConstraints[Op1].push_back(VBMOp1);
+		//valuesBranchMap.insert(std::make_pair(Op1, VBMOp1));
 
 		// Symbolic intervals for operand of op1 (if op1 is a cast instruction)
 		castinst = NULL;
@@ -209,11 +226,21 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 			SymbInterval* SFOp1_1 = new SymbInterval(CR, Op1, invPred);
 
 			ValueBranchMap VBMOp1_1(Op0_0, TBlock, FBlock, STOp1_1, SFOp1_1);
-			valuesBranchMap.insert(std::make_pair(Op0_0, VBMOp1_1));
+			IntervalConstraints[Op0_0].push_back(VBMOp1_1);
+			//valuesBranchMap.insert(std::make_pair(Op0_0, VBMOp1_1));
 		}
 	}
 }
 
+
+bool BranchAnalysis::doInitialization(Module &M){
+
+	numSwitchesAnalyzed = 0;
+	numBranchesAnalyzed = 0;
+
+	//We do not change the program; return false
+	return false;
+}
 
 bool BranchAnalysis::runOnFunction(Function& F){
 

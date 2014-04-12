@@ -10,7 +10,9 @@
 #define BASICINTERVAL_H_
 
 #include "Range.h"
-
+#include "RangeAnalysis.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/Support/raw_ostream.h"
 
 enum IntervalId {

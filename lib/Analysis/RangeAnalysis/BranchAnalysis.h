@@ -8,11 +8,19 @@
 #ifndef BRANCHANALYSIS_H_
 #define BRANCHANALYSIS_H_
 
-#include "llvm/IR/Instructions.h"
+//std includes
+#include <map>
+#include <list>
 
-#include "ValueBranchMap.h"
+//LLVM includes
+#include "llvm/ADT/Statistic.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/Support/ConstantRange.h"
+
+//Our own stuff
 #include "SymbolicInterval.h"
-#include <set>
+#include "ValueBranchMap.h"
+
 
 
 using namespace std;
@@ -23,7 +31,7 @@ class BranchAnalysis: public llvm::FunctionPass {
 private:
 	static char ID;
 
-	std::set<ValueSwitchMap> IntervalConstraints;
+	std::map<const Value*, std::list<ValueSwitchMap> > IntervalConstraints;
 
 public:
 
@@ -31,13 +39,16 @@ public:
 	virtual ~BranchAnalysis() {}
 
 	bool runOnFunction(Function &F);
+	virtual bool doInitialization(Module &M);
 
 	void buildValueSwitchMap(const SwitchInst *sw);
 	void buildValueBranchMap(const BranchInst *br);
 
-	virtual void getAnalysisUsage(AnalysisUsage & AU){
+	void getAnalysisUsage(AnalysisUsage &AU) const{
 		AU.setPreservesAll();
 	}
+
+	std::map<const Value*, std::list<ValueSwitchMap> > getIntervalConstraints(){ return IntervalConstraints;};
 
 };
 

@@ -22,7 +22,7 @@ using namespace llvm;
  */
 
 class ValueSwitchMap {
-private:
+protected:
 	const Value* V;
 	SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4 > BBsuccs;
 
