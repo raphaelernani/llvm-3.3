@@ -7,6 +7,8 @@
 
 #include "BasicInterval.h"
 
+using namespace llvm;
+
 // ========================================================================== //
 // BasicInterval
 // ========================================================================== //
@@ -16,7 +18,7 @@ BasicInterval::BasicInterval(const Range& range) :
 }
 
 BasicInterval::BasicInterval() :
-		range(Range(Min, Max)) {
+		range(Range()) {
 }
 
 BasicInterval::BasicInterval(const APInt& l, const APInt& u) :

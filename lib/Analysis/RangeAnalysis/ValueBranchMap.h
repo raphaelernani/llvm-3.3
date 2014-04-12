@@ -8,6 +8,7 @@
 #ifndef VALUEBRANCHMAP_H_
 #define VALUEBRANCHMAP_H_
 
+#include "BasicInterval.h"
 #include "SymbolicInterval.h"
 
 using namespace llvm;

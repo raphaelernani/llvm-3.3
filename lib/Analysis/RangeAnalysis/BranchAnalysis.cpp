@@ -263,3 +263,5 @@ bool BranchAnalysis::runOnFunction(Function& F){
 
 
 char BranchAnalysis::ID = 0;
+static RegisterPass<BranchAnalysis> X("branch-analysis",
+		"Branch Analysis");

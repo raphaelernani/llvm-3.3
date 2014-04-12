@@ -89,20 +89,4 @@ public:
 	bool operator!=(const Range& other) const;
 };
 
-
-// Print name of variable according to its type
-static void printVarName(const Value *V, raw_ostream& OS) {
-	const Argument *A = NULL;
-	const Instruction *I = NULL;
-
-	if ((A = dyn_cast<Argument>(V))) {
-		OS << A->getParent()->getName() << "." << A->getName();
-	} else if ((I = dyn_cast<Instruction>(V))) {
-		OS << I->getParent()->getParent()->getName() << "."
-				<< I->getParent()->getName() << "." << I->getName();
-	} else {
-		OS << V->getName();
-	}
-}
-
 #endif /* RANGE_H_ */
