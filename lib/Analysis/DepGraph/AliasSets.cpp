@@ -146,7 +146,7 @@ llvm::DenseMap<int, std::set<int> > AliasSets::getMemSets() {
 	return disjointSets;
 }
 
-int AliasSets::getValueSetKey(Value* v) {
+int AliasSets::getValueSetKey(const Value* v) {
 
 	if (valueDisjointSet.count(v)) return valueDisjointSet[v];
 

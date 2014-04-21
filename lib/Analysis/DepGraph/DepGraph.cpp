@@ -709,7 +709,7 @@ void DepGraph::removeNode(GraphNode* target){
 
 const std::string sigmaString = "vSSA_sigma";
 
-bool isSigma(PHINode* Phi){
+bool isSigma(const PHINode* Phi){
 	if (Phi->getName().startswith(sigmaString)
 		|| Phi->getMetadata(sigmaString) != 0
 		|| Phi->getMetadata("Sigma") != 0) return true;
@@ -817,7 +817,7 @@ void DepGraph::addEdge(GraphNode* src, GraphNode* dst, edgeType type) {
 }
 
 //It verify if the instruction is valid for the dependence graph, i.e. just data manipulator instructions are important for dependence graph
-bool DepGraph::isValidInst(Value *v) {
+bool DepGraph::isValidInst(const Value *v) {
 
 	if ((!includeAllInstsInDepGraph) && isa<Instruction> (v)) {
 
@@ -838,7 +838,7 @@ bool DepGraph::isValidInst(Value *v) {
 
 }
 
-bool llvm::DepGraph::isMemoryPointer(llvm::Value* v) {
+bool llvm::DepGraph::isMemoryPointer(const llvm::Value* v) {
         if (v && v->getType())
                 return v->getType()->isPointerTy();
         return false;
@@ -846,7 +846,7 @@ bool llvm::DepGraph::isMemoryPointer(llvm::Value* v) {
 
 //Return the pointer to the node related to the operand.
 //Return NULL if the operand is not inside map.
-GraphNode* DepGraph::findNode(Value *op) {
+GraphNode* DepGraph::findNode(const Value *op) {
 
         if (isMemoryPointer(op)) {
                 int index = USE_ALIAS_SETS ? AS->getValueSetKey(op) : 0;
@@ -884,7 +884,7 @@ std::set<GraphNode*> DepGraph::findNodes(std::set<Value*> values) {
         return result;
 }
 
-OpNode* llvm::DepGraph::findOpNode(llvm::Value* op) {
+OpNode* llvm::DepGraph::findOpNode(const llvm::Value* op) {
 
         if (opNodes.count(op))
                 return dyn_cast<OpNode> (opNodes[op]);

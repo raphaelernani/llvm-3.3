@@ -15,6 +15,9 @@
 ValueSwitchMap::ValueSwitchMap(const Value* V,
 		SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4> &BBsuccs) :
 		V(V), BBsuccs(BBsuccs) {
+	for (unsigned i = 0, e = BBsuccs.size(); i < e; ++i) {
+		BBids[this->BBsuccs[i].second] = i;
+	}
 }
 
 ValueSwitchMap::~ValueSwitchMap() {

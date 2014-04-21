@@ -40,6 +40,65 @@ void llvm::RangeAnalysis::narrowingAnalysis(int SCCid) {
 
 void llvm::RangeAnalysis::addConstraints(
 		std::map<const Value*, std::list<ValueSwitchMap> > constraints) {
+
+	//First we iterate through the constraints
+	std::map<const Value*, std::list<ValueSwitchMap> >::iterator Cit, Cend;
+	for(Cit = constraints.begin(), Cend = constraints.end(); Cit != Cend; Cit++){
+
+		const Value* CurrentValue = Cit->first;
+
+		// For each value, we iterate through its uses, looking for sigmas. We
+		// can only learn with conditionals when we insert sigmas, splitting the
+		// live ranges of the variables according to the branch results.
+
+		Value::const_use_iterator Uit, Uend;
+		for(Uit = CurrentValue->use_begin(), Uend = CurrentValue->use_end(); Uit != Uend; Uit++){
+
+			const User* U = *Uit;
+			if (const PHINode* CurrentUse = dyn_cast<const PHINode>(U)){
+
+				if(isSigma(CurrentUse)){
+
+					SigmaOpNode* CurrentSigmaOpNode = dyn_cast<SigmaOpNode>(depGraph->findOpNode(CurrentUse));
+					if(!CurrentSigmaOpNode) continue;
+
+					const BasicBlock* ParentBB = CurrentUse->getParent();
+
+					// We will look for the symbolic range of the basic block of this sigma node.
+					std::list<ValueSwitchMap>::iterator VSMit, VSMend;
+					for(VSMit = Cit->second.begin(), VSMend = Cit->second.end(); VSMit != VSMend; VSMit++){
+
+						ValueSwitchMap* CurrentVSM = &(*VSMit);
+
+						int Idx = CurrentVSM->getBBid(ParentBB);
+						if(Idx >= 0){
+
+							//Save the symbolic interval of the opNode. We will use it in the narrowing
+							// phase of the range analysis
+							BasicInterval* BI = CurrentVSM->getItv(Idx);
+							branchConstraints[CurrentSigmaOpNode] = *BI;
+
+							//If it is a symbolic interval, then we have a future value and we must
+							//insert a control dependence edge in the graph.
+							if(SymbInterval* SI = dyn_cast<SymbInterval>(BI)){
+								if (GraphNode* FutureValue = depGraph->findNode(SI->getBound())) {
+									depGraph->addEdge(FutureValue, CurrentSigmaOpNode, etControl);
+								}
+							}
+
+							break;
+						}
+
+					}
+
+				}
+
+			}
+
+		}
+
+	}
+
 }
 
 Range llvm::RangeAnalysis::getRange(Value* V) {

@@ -382,11 +382,11 @@ public:
 class DepGraph {
 private:
 		//Graph nodes
-		std::set<GraphNode*> nodes;							//List of nodes of the graph
-		llvm::DenseMap<Value*, GraphNode*> opNodes;			//Subset of nodes
-        llvm::DenseMap<Value*, GraphNode*> callNodes;		//Subset of opnodes
-        llvm::DenseMap<Value*, GraphNode*> varNodes;		//Subset of nodes
-        llvm::DenseMap<int, GraphNode*> memNodes;			//Subset of nodes
+		std::set<GraphNode*> nodes;							    //List of nodes of the graph
+		llvm::DenseMap<const Value*, GraphNode*> opNodes;		//Subset of nodes
+        llvm::DenseMap<const Value*, GraphNode*> callNodes;		//Subset of opnodes
+        llvm::DenseMap<const Value*, GraphNode*> varNodes;		//Subset of nodes
+        llvm::DenseMap<int, GraphNode*> memNodes;			    //Subset of nodes
 
 		//Navigation through subgraphs
 		DepGraph* parentGraph;							//Graph that has originated this graph
@@ -401,8 +401,8 @@ private:
 
 		AliasSets *AS;
 
-        bool isValidInst(Value *v); //Return true if the instruction is valid for dependence graph construction
-        bool isMemoryPointer(Value *v); //Return true if the value is a memory pointer
+        bool isValidInst(const Value *v); //Return true if the instruction is valid for dependence graph construction
+        bool isMemoryPointer(const Value *v); //Return true if the value is a memory pointer
 
 public:
         typedef std::set<GraphNode*>::iterator iterator;
@@ -423,12 +423,12 @@ public:
         void addEdge(GraphNode* src, GraphNode* dst, edgeType type = etData);
         void removeEdge(GraphNode* src, GraphNode* dst);
 
-        GraphNode* findNode(Value *op); //Return the pointer to the node or NULL if it is not in the graph
+        GraphNode* findNode(const Value *op); //Return the pointer to the node or NULL if it is not in the graph
         GraphNode* findNode(GraphNode* node); //Return the pointer to the node or NULL if it is not in the graph
 
         std::set<GraphNode*> findNodes(std::set<Value*> values);
 
-        OpNode* findOpNode(Value *op); //Return the pointer to the node or NULL if it is not in the graph
+        OpNode* findOpNode(const Value *op); //Return the pointer to the node or NULL if it is not in the graph
 
         //print graph in dot format
         class Guider {
@@ -609,7 +609,7 @@ public:
         }
 };
 
-
+bool isSigma(const PHINode* Phi);
 
 
 

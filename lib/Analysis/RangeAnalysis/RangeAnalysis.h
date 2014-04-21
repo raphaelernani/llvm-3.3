@@ -31,7 +31,7 @@ private:
 	void fixFutures(int SCCid);
 	void narrowingAnalysis(int SCCid);
 
-	std::map<SigmaOpNode*, SymbInterval> branchConstraints;
+	std::map<SigmaOpNode*, BasicInterval> branchConstraints;
 
 	std::map<GraphNode*,Range> computedRanges;
 protected:

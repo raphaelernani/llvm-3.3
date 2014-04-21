@@ -26,7 +26,7 @@ class ValueSwitchMap {
 protected:
 	const Value* V;
 	SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4 > BBsuccs;
-
+	std::map<const BasicBlock*, int> BBids;
 public:
 	ValueSwitchMap(const Value* V,
 		SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4 > &BBsuccs);
@@ -51,6 +51,14 @@ public:
 	/// Change the interval associated to the true side of the branch
 	void setItv(unsigned idx, BasicInterval *Itv) {
 		this->BBsuccs[idx].first = Itv;
+	}
+
+	int getBBid(const BasicBlock* BB){
+		if(!BBids.count(BB)){
+			return -1;
+		} else {
+			return BBids[BB];
+		}
 	}
 
 	/// Clear memory allocated

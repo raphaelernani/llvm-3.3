@@ -33,7 +33,7 @@ private:
 		llvm::DenseMap<int, int> disjointSet; // maps integers to the disjoint sets that contains the integer
 		llvm::DenseMap<int, std::set<int> > disjointSets; // table of disjoint sets
 
-		llvm::DenseMap<Value*, int> valueDisjointSet; // maps integers to the disjoint sets that contains the integer
+		llvm::DenseMap<const Value*, int> valueDisjointSet; // maps integers to the disjoint sets that contains the integer
 		llvm::DenseMap<int, std::set<Value*> > valueDisjointSets; // table of disjoint sets
 
 		bool runOnModule(Module &M);
@@ -49,7 +49,7 @@ private:
 		void getAnalysisUsage(AnalysisUsage &AU) const;
 		llvm::DenseMap<int, std::set<Value*> > getValueSets();
 		llvm::DenseMap<int, std::set<int> > getMemSets();
-		int getValueSetKey(Value* v);
+		int getValueSetKey(const Value* v);
 		int getMapSetKey(int m);
 	};
 }
