@@ -33,7 +33,8 @@ private:
 
 	std::map<SigmaOpNode*, BasicInterval> branchConstraints;
 
-	std::map<GraphNode*,Range> computedRanges;
+	std::map<GraphNode*,Range> in_state;
+	std::map<GraphNode*,Range> out_state;
 protected:
 	void solve();
 	void addConstraints(std::map<const Value*, std::list<ValueSwitchMap> > constraints);

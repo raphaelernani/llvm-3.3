@@ -30,6 +30,43 @@ void llvm::RangeAnalysis::solve() {
 }
 
 void llvm::RangeAnalysis::growthAnalysis(int SCCid) {
+
+	SCC_Iterator it(depGraph, SCCid);
+
+	std::set<GraphNode*> worklist;
+
+	while(it.hasNext()){
+
+		GraphNode* node = it.getNext;
+		in_state[node] = Range(Min, Max, Unknown);
+		out_state[node] = Range(Min, Max, Unknown);
+
+		std::map<GraphNode*, edgeType> preds = node->getPredecessors();
+		if (preds.size() == 0) {
+			worklist.insert(node);
+		} else {
+			for(std::map<GraphNode*, edgeType>::iterator pred = preds.begin(), pred_end = preds.end(); pred != pred_end; pred++){
+				//Only data dependence edges
+				if(pred->second != etData) continue;
+
+				//looking for nodes that receive information from outside the SCC
+				if(depGraph->getSCCID(pred->first) != SCCid) {
+					worklist.insert(node);
+					break;
+				}
+			}
+		}
+	}
+
+	while(worklist.size() > 0){
+
+		GraphNode* currentNode = *(worklist.begin());
+		worklist.erase(currentNode);
+
+		compute(currentNode, worklist);
+
+	}
+
 }
 
 void llvm::RangeAnalysis::fixFutures(int SCCid) {
@@ -104,7 +141,7 @@ void llvm::RangeAnalysis::addConstraints(
 Range llvm::RangeAnalysis::getRange(Value* V) {
 
 	if (GraphNode* Node = depGraph->findNode(V) )
-		return computedRanges[Node];
+		return out_state[Node];
 
 	//Value not found. Return [-inf,+inf]
 	errs() << "Requesting range for unknown value: " << V << "\n";

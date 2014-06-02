@@ -367,6 +367,9 @@ public:
 };
 
 
+
+
+
 /*
  * Class Graph
  *
@@ -406,6 +409,7 @@ private:
 
 public:
         typedef std::set<GraphNode*>::iterator iterator;
+
 
         std::set<GraphNode*>::iterator begin();
         std::set<GraphNode*>::iterator end();
@@ -537,6 +541,53 @@ public:
         std::set<std::stack<GraphNode*> > getAcyclicPathsInsideSCC(GraphNode* src, GraphNode* dst);
 
 };
+
+//TODO: Refactor this
+class SCC_Iterator {
+private:
+	DepGraph* Graph;
+	int SCCID;
+
+	DepGraph::iterator currentIt;
+
+public:
+
+	SCC_Iterator(DepGraph* Graph, int SCCID): Graph(Graph), SCCID(SCCID){
+
+		for( DepGraph::iterator node_it = Graph->begin(), node_end = Graph->end();  node_it != node_end; node_it++ ){
+			GraphNode* current_node = *node_it;
+			if(Graph->getSCCID(current_node) == SCCID){
+				currentIt = node_it;
+				break;
+			}
+		}
+
+	};
+	~SCC_Iterator(){};
+
+	bool hasNext(){
+		return (currentIt != Graph->end());
+	}
+
+	GraphNode* getNext(){
+
+		if (!hasNext()) return NULL;
+		GraphNode* result = *currentIt;
+
+		for( DepGraph::iterator node_end = Graph->end();  currentIt != node_end; currentIt++ ){
+			GraphNode* current_node = *currentIt;
+			if(Graph->getSCCID(current_node) == SCCID){
+				break;
+			}
+		}
+
+		return result;
+	}
+
+
+
+};
+
 
 /*
  * Class functionDepGraph
