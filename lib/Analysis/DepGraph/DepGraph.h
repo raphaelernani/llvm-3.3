@@ -173,9 +173,9 @@ public:
  */
 class UnaryOpNode: public OpNode {
 private:
-	Instruction* UOP;
+	UnaryInstruction* UOP;
 public:
-	UnaryOpNode(Instruction* UOP) :
+	UnaryOpNode(UnaryInstruction* UOP) :
                 OpNode(UOP), UOP(UOP) {
                 this->Class_ID = UnaryOpNodeId;
         }
@@ -185,6 +185,10 @@ public:
 				|| N->getClass_Id() == SigmaOpNodeId;
 	}
 	;
+
+	BinaryOperator* getUnaryInstruction() {return UOP;};
+
+	GraphNode* getOperand();
 
 	GraphNode* clone();
 };
@@ -263,6 +267,8 @@ public:
         }
         ;
         BinaryOperator* getBinaryOperator() {return BOP;};
+
+        GraphNode* getOperand(unsigned int index);
 
         GraphNode* clone();
 };

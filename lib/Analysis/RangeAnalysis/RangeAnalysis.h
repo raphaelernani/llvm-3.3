@@ -35,6 +35,16 @@ private:
 
 	std::map<GraphNode*,Range> in_state;
 	std::map<GraphNode*,Range> out_state;
+
+
+
+	void computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist);
+
+	Range getUnionOfPredecessors(GraphNode* Node);
+	Range abstractInterpretation(Range Op1, Range Op2, Instruction *I);
+	Range abstractInterpretation(Range Op1, Instruction *I);
+
+
 protected:
 	void solve();
 	void addConstraints(std::map<const Value*, std::list<ValueSwitchMap> > constraints);

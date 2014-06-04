@@ -63,9 +63,163 @@ void llvm::RangeAnalysis::growthAnalysis(int SCCid) {
 		GraphNode* currentNode = *(worklist.begin());
 		worklist.erase(currentNode);
 
-		compute(currentNode, worklist);
+		computeNode(currentNode, worklist);
 
 	}
+
+}
+
+Range llvm::RangeAnalysis::getUnionOfPredecessors(GraphNode* Node){
+	Range result(Min, Max, Unknown);
+
+	std::map<GraphNode*, edgeType> Preds = Node->getPredecessors();
+	std::map<GraphNode*, edgeType>::iterator pred, pred_end;
+	for(pred = Preds.begin(), pred_end = Preds.end(); pred != pred_end; pred++){
+
+		if(pred->second == etData){
+			result = result.unionWith(out_state[pred->first]);
+		}
+	}
+
+	return result;
+}
+
+/*
+ * Abstract interpretation of binary operators
+ */
+Range llvm::RangeAnalysis::abstractInterpretation(Range Op1, Range Op2, Instruction *I){
+
+	switch(I->getOpcode()){
+		case Instruction::Add:  return Op1.add(Op2);
+		case Instruction::Sub:  return Op1.sub(Op2);
+		case Instruction::Mul:  return Op1.mul(Op2);
+		case Instruction::SDiv: return Op1.sdiv(Op2);
+		case Instruction::UDiv: return Op1.udiv(Op2);
+		case Instruction::SRem: return Op1.srem(Op2);
+		case Instruction::URem: return Op1.urem(Op2);
+		case Instruction::Shl:  return Op1.shl(Op2);
+		case Instruction::AShr: return Op1.ashr(Op2);
+		case Instruction::LShr: return Op1.lshr(Op2);
+		case Instruction::And:  return Op1.And(Op2);
+		case Instruction::Or:   return Op1.Or(Op2);
+		case Instruction::Xor:  return Op1.Xor(Op2);
+		default:
+			errs() << "Unhandled Instruction:" << *I;
+			return Range(Min,Max);
+	}
+
+}
+
+/*
+ * Abstract interpretation of unary operators
+ */
+Range abstractInterpretation(Range Op1, Instruction *I){
+
+	switch(I->getOpcode()){
+
+		case Instruction::Sub:  return Op1.sub(Op2);
+		case Instruction::Mul:  return Op1.mul(Op2);
+		case Instruction::SDiv: return Op1.sdiv(Op2);
+		default:
+			errs() << "Unhandled Opcode:" << opCode;
+			return Range(Min,Max);
+	}
+
+
+	unsigned bw = I->getType()->getPrimitiveSizeInBits();
+	Range result(Min, Max, Unknown);
+
+	if (Op1.isRegular()) {
+		switch (I->getOpcode()) {
+		case Instruction::Trunc:
+			result = Op1.truncate(bw);
+			break;
+		case Instruction::ZExt:
+			result = Op1.zextOrTrunc(bw);
+			break;
+		case Instruction::SExt:
+			result = Op1.sextOrTrunc(bw);
+			break;
+		case Instruction::Load:
+			result = Op1;
+			break;
+		default:
+			result = Range(Min, Max);
+			break;
+		}
+	} else if (Op1.isEmpty())
+		errs() << "Unhandled UnaryInstruction:" << *I;
+		result = Range(Min, Max, Empty);
+
+	return result;
+}
+
+/*
+ * Here we do the abstract interpretation.
+ *
+ * We compute the out_state of a node based in the out_state of
+ * the predecessors of the node.
+ *
+ * We also perform the widening operation as needed.
+ *
+ * Finally, if the out_state is changed, we add to the worklist the successor nodes.
+ */
+void llvm::RangeAnalysis::computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist){
+
+	Range new_out_state;
+
+	/*
+	 * VarNode: Constants generate constant ranges;
+	 * otherwise, the output is a union of the predecessors
+	 * */
+	if(VarNode* VN = dyn_cast<VarNode>(Node)){
+		Value* val = VN->getValue();
+
+		if (ConstantInt* CI = dyn_cast<ConstantInt>(val)){
+			APInt value = CI->getValue();
+			new_out_state = Range(value,value);
+		} else {
+			new_out_state = getUnionOfPredecessors(Node);
+		}
+
+	}
+	/*
+	 * Nodes that do not modify the data: PHI, Sigma, MemNode
+	 * >> Just forward the state to the next node.
+	 */
+	else if (isa<MemNode>(Node) || isa<SigmaOpNode>(Node) || isa<PHIOpNode>(Node) ) {
+		new_out_state = getUnionOfPredecessors(Node);
+	}
+	/*
+	 * CallNodes: We do not know the output
+	 * >> [-inf, +inf]
+	 */
+	else if (isa<CallNode>(Node)) {
+		new_out_state = Range(Min, Max)
+	}
+	/*
+	 * Binary operators: we will do the abstract interpretation
+	 * to generate the result
+	 */
+	else if (BinaryOpNode* BOP = dyn_cast<BinaryOpNode>(Node)) {
+
+		GraphNode* Op1 = BOP->getOperand(0);
+		GraphNode* Op2 = BOP->getOperand(1);
+
+		new_out_state = abstractInterpretation(out_state[Op1], out_state[Op2], BOP->getBinaryOperator());
+	}
+	/*
+	 * Unary operators: we will do the abstract interpretation
+	 * to generate the result
+	 */
+	else if (UnaryOpNode* UOP = dyn_cast<BinaryOpNode>(Node)) {
+
+		GraphNode* Op = UOP->getOperand();
+
+		new_out_state = abstractInterpretation(out_state[Op], UOP->getUnaryInstruction());
+	}
+
+
 
 }
 
