@@ -159,6 +159,29 @@ GraphNode* llvm::OpNode::clone() {
 
 }
 
+GraphNode* llvm::OpNode::getOperand(unsigned int index, edgeType et){
+
+	GraphNode* result = NULL;
+
+	std::map<GraphNode*, edgeType>::iterator pred, pred_end;
+	for(pred = predecessors.begin(), pred_end = predecessors.end(); pred != pred_end && index > 0; pred++){
+
+		if(pred->second == et){
+
+			if(index == 0) {
+				result = pred->first;
+			}
+
+			index--;
+
+		}
+
+	}
+
+	return result;
+
+}
+
 /*
  * Class PHIOpNode
  */
@@ -191,31 +214,6 @@ std::string llvm::PHIOpNode::getStyle() {
 /*
  * Class BinaryOpNode
  */
-GraphNode* llvm::BinaryOpNode::getOperand(unsigned int index){
-
-	GraphNode* result = NULL;
-
-	std::map<GraphNode*, edgeType>::iterator pred, pred_end;
-	for(pred = predecessors.begin(), pred_end = predecessors.end(); pred != pred_end && index > 0; pred++){
-
-		if(pred->second == etData){
-
-			if(index == 0) {
-				result = pred->first;
-			}
-
-			index--;
-
-		}
-
-	}
-
-	return result;
-
-}
-
-
-
 GraphNode* llvm::BinaryOpNode::clone() {
 	BinaryOpNode* R = new BinaryOpNode(*this);
 	R->Class_ID = this->Class_ID;
@@ -225,27 +223,6 @@ GraphNode* llvm::BinaryOpNode::clone() {
 /*
  * Class UnaryOpNode
  */
-GraphNode* llvm::UnaryOpNode::getOperand(){
-
-	GraphNode* result = NULL;
-
-	std::map<GraphNode*, edgeType>::iterator pred, pred_end;
-	for(pred = predecessors.begin(), pred_end = predecessors.end(); pred != pred_end; pred++){
-
-		if(pred->second == etData){
-
-			result = pred->first;
-			break;
-
-		}
-
-	}
-
-	return result;
-
-}
-
-
 GraphNode* llvm::UnaryOpNode::clone() {
 	UnaryOpNode* R = new UnaryOpNode(*this);
 	R->Class_ID = this->Class_ID;

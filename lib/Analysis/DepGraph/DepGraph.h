@@ -73,14 +73,13 @@ enum NodeClassId {
  */
 class GraphNode {
 private:
-        std::map<GraphNode*, edgeType> successors;
-        std::map<GraphNode*, edgeType> predecessors;
-
         static int currentID;
         int ID;
 
 protected:
         int Class_ID;
+        std::map<GraphNode*, edgeType> successors;
+        std::map<GraphNode*, edgeType> predecessors;
 public:
         GraphNode();
         GraphNode(GraphNode &G);
@@ -159,6 +158,8 @@ public:
         void setOpCode(unsigned int opCode);
         Instruction* getOperation() {return inst;};
 
+        virtual GraphNode* getOperand(unsigned int index = 0, edgeType et = etData);
+
         virtual std::string getLabel();
         virtual std::string getShape();
 
@@ -186,9 +187,7 @@ public:
 	}
 	;
 
-	BinaryOperator* getUnaryInstruction() {return UOP;};
-
-	GraphNode* getOperand();
+	UnaryInstruction* getUnaryInstruction() {return UOP;};
 
 	GraphNode* clone();
 };
@@ -198,12 +197,12 @@ public:
  *
  * This class represents operation nodes of llvm::PHINode instructions that are sigma operations
  */
-class SigmaOpNode: public UnaryOpNode {
+class SigmaOpNode: public OpNode {
 private:
         PHINode* Sigma;
 public:
         SigmaOpNode(PHINode* Sigma) :
-        		UnaryOpNode(Sigma), Sigma(Sigma) {
+        		OpNode(Sigma), Sigma(Sigma) {
                 this->Class_ID = SigmaOpNodeId;
         }
         ;
@@ -267,8 +266,6 @@ public:
         }
         ;
         BinaryOperator* getBinaryOperator() {return BOP;};
-
-        GraphNode* getOperand(unsigned int index);
 
         GraphNode* clone();
 };

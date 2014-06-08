@@ -32,17 +32,18 @@ private:
 	void narrowingAnalysis(int SCCid);
 
 	std::map<SigmaOpNode*, BasicInterval> branchConstraints;
-
-	std::map<GraphNode*,Range> in_state;
 	std::map<GraphNode*,Range> out_state;
 
-
-
 	void computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist);
+	void addSuccessorsToWorklist(GraphNode* Node, std::set<GraphNode*> &Worklist);
 
+	Range evaluateNode(GraphNode* Node);
 	Range getUnionOfPredecessors(GraphNode* Node);
 	Range abstractInterpretation(Range Op1, Range Op2, Instruction *I);
 	Range abstractInterpretation(Range Op1, Instruction *I);
+
+	bool join(GraphNode* Node, Range new_abstract_state);
+	bool meet(GraphNode* Node, Range new_abstract_state);
 
 
 protected:

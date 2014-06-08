@@ -37,8 +37,7 @@ void llvm::RangeAnalysis::growthAnalysis(int SCCid) {
 
 	while(it.hasNext()){
 
-		GraphNode* node = it.getNext;
-		in_state[node] = Range(Min, Max, Unknown);
+		GraphNode* node = it.getNext();
 		out_state[node] = Range(Min, Max, Unknown);
 
 		std::map<GraphNode*, edgeType> preds = node->getPredecessors();
@@ -67,6 +66,79 @@ void llvm::RangeAnalysis::growthAnalysis(int SCCid) {
 
 	}
 
+}
+
+Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
+
+	Range result;
+
+	/*
+	 * VarNode: Constants generate constant ranges;
+	 * otherwise, the output is a union of the predecessors
+	 * */
+	if(VarNode* VN = dyn_cast<VarNode>(Node)){
+		Value* val = VN->getValue();
+
+		if (ConstantInt* CI = dyn_cast<ConstantInt>(val)){
+			APInt value = CI->getValue();
+			result = Range(value,value);
+		} else {
+			result = getUnionOfPredecessors(Node);
+		}
+
+	}
+	/*
+	 * Nodes that do not modify the data: PHI, Sigma, MemNode
+	 * >> Just forward the state to the next node.
+	 */
+	else if (isa<MemNode>(Node) || isa<SigmaOpNode>(Node) || isa<PHIOpNode>(Node) ) {
+		result = getUnionOfPredecessors(Node);
+	}
+	/*
+	 * CallNodes: We do not know the output
+	 * >> [-inf, +inf]
+	 */
+	else if (isa<CallNode>(Node)) {
+		result = Range(Min, Max);
+	}
+	/*
+	 * Binary operators: we will do the abstract interpretation
+	 * to generate the result
+	 */
+	else if (BinaryOpNode* BOP = dyn_cast<BinaryOpNode>(Node)) {
+
+		GraphNode* Op1 = BOP->getOperand(0);
+		GraphNode* Op2 = BOP->getOperand(1);
+
+		result = abstractInterpretation(out_state[Op1], out_state[Op2], BOP->getBinaryOperator());
+	}
+	/*
+	 * Unary operators: we will do the abstract interpretation
+	 * to generate the result
+	 */
+	else if (UnaryOpNode* UOP = dyn_cast<UnaryOpNode>(Node)) {
+
+		GraphNode* Op = UOP->getOperand();
+
+		result = abstractInterpretation(out_state[Op], UOP->getUnaryInstruction());
+	}
+	/*
+	 * Generic operations: treat individually case by case
+	 */
+	else if (OpNode* OP = dyn_cast<OpNode>(Node)) {
+
+		Instruction* I = OP->getOperation();
+
+		switch (I->getOpcode()) {
+		case Instruction::Store:
+			GraphNode* Op = OP->getOperand(0);
+			result = abstractInterpretation(out_state[Op], I);
+			break;
+		}
+
+	}
+
+	return result;
 }
 
 Range llvm::RangeAnalysis::getUnionOfPredecessors(GraphNode* Node){
@@ -107,24 +179,12 @@ Range llvm::RangeAnalysis::abstractInterpretation(Range Op1, Range Op2, Instruct
 			errs() << "Unhandled Instruction:" << *I;
 			return Range(Min,Max);
 	}
-
 }
 
 /*
  * Abstract interpretation of unary operators
  */
 Range abstractInterpretation(Range Op1, Instruction *I){
-
-	switch(I->getOpcode()){
-
-		case Instruction::Sub:  return Op1.sub(Op2);
-		case Instruction::Mul:  return Op1.mul(Op2);
-		case Instruction::SDiv: return Op1.sdiv(Op2);
-		default:
-			errs() << "Unhandled Opcode:" << opCode;
-			return Range(Min,Max);
-	}
-
 
 	unsigned bw = I->getType()->getPrimitiveSizeInBits();
 	Range result(Min, Max, Unknown);
@@ -143,13 +203,17 @@ Range abstractInterpretation(Range Op1, Instruction *I){
 		case Instruction::Load:
 			result = Op1;
 			break;
+		case Instruction::Store:
+			result = Op1;
+			break;
 		default:
+			errs() << "Unhandled UnaryInstruction:" << *I;
 			result = Range(Min, Max);
 			break;
 		}
-	} else if (Op1.isEmpty())
-		errs() << "Unhandled UnaryInstruction:" << *I;
+	} else if (Op1.isEmpty()) {
 		result = Range(Min, Max, Empty);
+	}
 
 	return result;
 }
@@ -166,64 +230,91 @@ Range abstractInterpretation(Range Op1, Instruction *I){
  */
 void llvm::RangeAnalysis::computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist){
 
-	Range new_out_state;
+	Range new_out_state = evaluateNode(Node);
 
-	/*
-	 * VarNode: Constants generate constant ranges;
-	 * otherwise, the output is a union of the predecessors
-	 * */
-	if(VarNode* VN = dyn_cast<VarNode>(Node)){
-		Value* val = VN->getValue();
-
-		if (ConstantInt* CI = dyn_cast<ConstantInt>(val)){
-			APInt value = CI->getValue();
-			new_out_state = Range(value,value);
-		} else {
-			new_out_state = getUnionOfPredecessors(Node);
-		}
-
+	if (join(Node, new_out_state)) {
+		//The range of this node has changed. Add its successors to the worklist.
+		addSuccessorsToWorklist(Node, Worklist);
 	}
-	/*
-	 * Nodes that do not modify the data: PHI, Sigma, MemNode
-	 * >> Just forward the state to the next node.
-	 */
-	else if (isa<MemNode>(Node) || isa<SigmaOpNode>(Node) || isa<PHIOpNode>(Node) ) {
-		new_out_state = getUnionOfPredecessors(Node);
-	}
-	/*
-	 * CallNodes: We do not know the output
-	 * >> [-inf, +inf]
-	 */
-	else if (isa<CallNode>(Node)) {
-		new_out_state = Range(Min, Max)
-	}
-	/*
-	 * Binary operators: we will do the abstract interpretation
-	 * to generate the result
-	 */
-	else if (BinaryOpNode* BOP = dyn_cast<BinaryOpNode>(Node)) {
-
-		GraphNode* Op1 = BOP->getOperand(0);
-		GraphNode* Op2 = BOP->getOperand(1);
-
-		new_out_state = abstractInterpretation(out_state[Op1], out_state[Op2], BOP->getBinaryOperator());
-	}
-	/*
-	 * Unary operators: we will do the abstract interpretation
-	 * to generate the result
-	 */
-	else if (UnaryOpNode* UOP = dyn_cast<BinaryOpNode>(Node)) {
-
-		GraphNode* Op = UOP->getOperand();
-
-		new_out_state = abstractInterpretation(out_state[Op], UOP->getUnaryInstruction());
-	}
-
-
 
 }
 
+void llvm::RangeAnalysis::addSuccessorsToWorklist(GraphNode* Node, std::set<GraphNode*> &Worklist){
+
+	std::map<GraphNode*, edgeType> succs = Node->getSuccessors();
+
+	std::map<GraphNode*, edgeType>::iterator succ, succ_end;
+	for(succ = succs.begin(), succ_end = succs.end(); succ != succ_end; succ++){
+
+		if(succ->second == etData){
+			Worklist.insert(succ->first);
+		}
+	}
+
+}
+
+bool llvm::RangeAnalysis::join(GraphNode* Node, Range new_abstract_state){
+
+	/*
+	 * Here we perform the join operation in the interval lattice,
+	 * with Cousot's widening operator.
+	 */
+
+	Range oldInterval = out_state[Node];
+	Range newInterval = new_abstract_state;
+
+	APInt oldLower = oldInterval.getLower();
+	APInt oldUpper = oldInterval.getUpper();
+	APInt newLower = newInterval.getLower();
+	APInt newUpper = newInterval.getUpper();
+
+	if (oldInterval.isUnknown())
+		out_state[Node] = newInterval;
+	else {
+		APInt oldLower = oldInterval.getLower();
+		APInt oldUpper = oldInterval.getUpper();
+		APInt newLower = newInterval.getLower();
+		APInt newUpper = newInterval.getUpper();
+		if (newLower.slt(oldLower))
+			if (newUpper.sgt(oldUpper))
+				out_state[Node] = Range(Min, Max);
+			else
+				out_state[Node] = Range(Min, oldUpper);
+		else if (newUpper.sgt(oldUpper))
+			out_state[Node] = Range(oldLower, Max);
+	}
+
+	bool hasChanged = oldInterval != out_state[Node];
+
+	return hasChanged;
+}
+
 void llvm::RangeAnalysis::fixFutures(int SCCid) {
+
+	SCC_Iterator it(depGraph, SCCid);
+
+	while(it.hasNext()){
+
+		if (SigmaOpNode* Node = dyn_cast<SigmaOpNode>(it.getNext())) {
+
+			if (branchConstraints.count(Node) > 0) {
+
+				if (SymbInterval* SI = dyn_cast<SymbInterval>(&(branchConstraints[Node]))) {
+
+					GraphNode* ControlDep = Node->getOperand(0, etControl);
+
+					SI->fixIntersects(out_state[ControlDep]);
+
+					out_state[Node] = out_state[Node].intersectWith(SI->getRange());
+
+				}
+
+			}
+
+		}
+
+	}
+
 }
 
 void llvm::RangeAnalysis::narrowingAnalysis(int SCCid) {
