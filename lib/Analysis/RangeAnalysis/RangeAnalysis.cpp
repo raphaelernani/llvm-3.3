@@ -31,40 +31,7 @@ void llvm::RangeAnalysis::solve() {
 
 void llvm::RangeAnalysis::growthAnalysis(int SCCid) {
 
-	SCC_Iterator it(depGraph, SCCid);
-
-	std::set<GraphNode*> worklist;
-
-	while(it.hasNext()){
-
-		GraphNode* node = it.getNext();
-		out_state[node] = Range(Min, Max, Unknown);
-
-		std::map<GraphNode*, edgeType> preds = node->getPredecessors();
-		if (preds.size() == 0) {
-			worklist.insert(node);
-		} else {
-			for(std::map<GraphNode*, edgeType>::iterator pred = preds.begin(), pred_end = preds.end(); pred != pred_end; pred++){
-				//Only data dependence edges
-				if(pred->second != etData) continue;
-
-				//looking for nodes that receive information from outside the SCC
-				if(depGraph->getSCCID(pred->first) != SCCid) {
-					worklist.insert(node);
-					break;
-				}
-			}
-		}
-	}
-
-	while(worklist.size() > 0){
-
-		GraphNode* currentNode = *(worklist.begin());
-		worklist.erase(currentNode);
-
-		computeNode(currentNode, worklist);
-
-	}
+	fixPointIteration(SCCid, loJoin);
 
 }
 
@@ -218,6 +185,12 @@ Range abstractInterpretation(Range Op1, Instruction *I){
 	return result;
 }
 
+
+void fixPointIteration(int SCCid, bool(*latticeOperation)(GraphNode*, Range)){
+
+}
+
+
 /*
  * Here we do the abstract interpretation.
  *
@@ -228,11 +201,13 @@ Range abstractInterpretation(Range Op1, Instruction *I){
  *
  * Finally, if the out_state is changed, we add to the worklist the successor nodes.
  */
-void llvm::RangeAnalysis::computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist){
+void llvm::RangeAnalysis::computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist, LatticeOperation lo){
 
 	Range new_out_state = evaluateNode(Node);
 
-	if (join(Node, new_out_state)) {
+	bool hasChanged = (lo == loJoin ? join(Node, new_out_state) : meet(Node, new_out_state));
+
+	if (hasChanged) {
 		//The range of this node has changed. Add its successors to the worklist.
 		addSuccessorsToWorklist(Node, Worklist);
 	}
@@ -289,6 +264,42 @@ bool llvm::RangeAnalysis::join(GraphNode* Node, Range new_abstract_state){
 	return hasChanged;
 }
 
+bool llvm::RangeAnalysis::meet(GraphNode* Node, Range new_abstract_state){
+
+	APInt oLower = out_state[Node].getLower();
+	APInt oUpper = out_state[Node].getUpper();
+	Range newInterval = new_abstract_state;
+
+	APInt nLower = newInterval.getLower();
+	APInt nUpper = newInterval.getUpper();
+
+	bool hasChanged = false;
+
+	if (oLower.eq(Min) && nLower.ne(Min)) {
+		out_state[Node] = Range(nLower, oUpper);
+		hasChanged = true;
+	} else {
+		APInt smin = APIntOps::smin(oLower, nLower);
+		if (oLower.ne(smin)) {
+			out_state[Node] = Range(smin, oUpper);
+			hasChanged = true;
+		}
+	}
+
+	if (oUpper.eq(Max) && nUpper.ne(Max)) {
+		out_state[Node] = Range(out_state[Node].getLower(), nUpper);
+		hasChanged = true;
+	} else {
+		APInt smax = APIntOps::smax(oUpper, nUpper);
+		if (oUpper.ne(smax)) {
+			out_state[Node] = Range(out_state[Node].getLower(), smax);
+			hasChanged = true;
+		}
+	}
+
+	return hasChanged;
+}
+
 void llvm::RangeAnalysis::fixFutures(int SCCid) {
 
 	SCC_Iterator it(depGraph, SCCid);
@@ -318,6 +329,9 @@ void llvm::RangeAnalysis::fixFutures(int SCCid) {
 }
 
 void llvm::RangeAnalysis::narrowingAnalysis(int SCCid) {
+
+	fixPointIteration(SCCid, loMeet);
+
 }
 
 void llvm::RangeAnalysis::addConstraints(
@@ -378,6 +392,45 @@ void llvm::RangeAnalysis::addConstraints(
 			}
 
 		}
+
+	}
+
+}
+
+void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
+
+	SCC_Iterator it(depGraph, SCCid);
+
+	std::set<GraphNode*> worklist;
+
+	while(it.hasNext()){
+
+		GraphNode* node = it.getNext();
+		out_state[node] = Range(Min, Max, Unknown);
+
+		std::map<GraphNode*, edgeType> preds = node->getPredecessors();
+		if (preds.size() == 0) {
+			worklist.insert(node);
+		} else {
+			for(std::map<GraphNode*, edgeType>::iterator pred = preds.begin(), pred_end = preds.end(); pred != pred_end; pred++){
+				//Only data dependence edges
+				if(pred->second != etData) continue;
+
+				//looking for nodes that receive information from outside the SCC
+				if(depGraph->getSCCID(pred->first) != SCCid) {
+					worklist.insert(node);
+					break;
+				}
+			}
+		}
+	}
+
+	while(worklist.size() > 0){
+
+		GraphNode* currentNode = *(worklist.begin());
+		worklist.erase(currentNode);
+
+		computeNode(currentNode, worklist, lo);
 
 	}
 

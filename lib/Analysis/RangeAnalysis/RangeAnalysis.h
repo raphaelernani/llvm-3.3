@@ -25,6 +25,10 @@
 
 namespace llvm {
 
+typedef enum {
+        loJoin = 0, loMeet = 1
+} LatticeOperation;
+
 class RangeAnalysis {
 private:
 	void growthAnalysis(int SCCid);
@@ -34,7 +38,9 @@ private:
 	std::map<SigmaOpNode*, BasicInterval> branchConstraints;
 	std::map<GraphNode*,Range> out_state;
 
-	void computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist);
+	void fixPointIteration(int SCCid, LatticeOperation lo);
+
+	void computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist, LatticeOperation lo);
 	void addSuccessorsToWorklist(GraphNode* Node, std::set<GraphNode*> &Worklist);
 
 	Range evaluateNode(GraphNode* Node);
