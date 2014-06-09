@@ -27,9 +27,11 @@ protected:
 	const Value* V;
 	SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4 > BBsuccs;
 	std::map<const BasicBlock*, int> BBids;
+	ValueSwitchMap(const Value* V): V(V){};
+
 public:
 	ValueSwitchMap(const Value* V,
-		SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4 > &BBsuccs);
+		SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4 > BBsuccs);
 
 	~ValueSwitchMap();
 	/// Get the "false side" of the branch
@@ -67,8 +69,6 @@ public:
 
 
 class ValueBranchMap: public ValueSwitchMap {
-private:
-	SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4 > VBM_BBsuccs;
 public:
 	ValueBranchMap(const Value* V,
 		const BasicBlock* BBTrue,

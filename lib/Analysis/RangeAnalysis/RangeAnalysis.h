@@ -35,7 +35,7 @@ private:
 	void fixFutures(int SCCid);
 	void narrowingAnalysis(int SCCid);
 
-	std::map<SigmaOpNode*, BasicInterval> branchConstraints;
+	std::map<SigmaOpNode*, BasicInterval*> branchConstraints;
 	std::map<GraphNode*,Range> out_state;
 
 	void fixPointIteration(int SCCid, LatticeOperation lo);
@@ -54,7 +54,7 @@ private:
 
 protected:
 	void solve();
-	void addConstraints(std::map<const Value*, std::list<ValueSwitchMap> > constraints);
+	void addConstraints(std::map<const Value*, std::list<ValueSwitchMap*> > constraints);
 
 public:
 	DepGraph* depGraph;

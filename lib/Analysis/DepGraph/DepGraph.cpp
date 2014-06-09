@@ -732,7 +732,7 @@ void DepGraph::removeNode(GraphNode* target){
 
 const std::string sigmaString = "vSSA_sigma";
 
-bool isSigma(const PHINode* Phi){
+bool DepGraph::isSigma(const PHINode* Phi){
 	if (Phi->getName().startswith(sigmaString)
 		|| Phi->getMetadata(sigmaString) != 0
 		|| Phi->getMetadata("Sigma") != 0) return true;
@@ -1257,11 +1257,12 @@ std::map<int, std::set<GraphNode*> > llvm::DepGraph::getSCCs(){
 
 std::list<int> llvm::DepGraph::getSCCTopologicalOrder(){
 
+	std::map<int, std::set<int> > dagSCC;
+
+
 	if (!topologicalOrderedSCCs.size()) {
 
 		recomputeSCCs();
-
-		GenericGraph<int> dagSCC;
 
 		//Step 1: Build SCC DAG
 		std::map<int, std::set<GraphNode*> >  localSCCs = getSCCs();
@@ -1271,23 +1272,26 @@ std::list<int> llvm::DepGraph::getSCCTopologicalOrder(){
 
 			int currentSCC = it->first;
 
-			GenericGraphNode<int>* currentSCCNode = dagSCC.addNode(currentSCC);
+			dagSCC[currentSCC].clear();
 
 			//... iterate over its nodes...
 			for ( std::set<GraphNode*>::iterator node = it->second.begin(); node != it->second.end(); node++ ){
 				GraphNode* currentNode = *node;
 
-				//... and create edges to the SCCs of the successors
+				//... and create edges from the successor SCCs
 				std::map<GraphNode*, edgeType> successors = currentNode->getSuccessors();
 				for (std::map<GraphNode*, edgeType>::iterator succ = successors.begin(); succ != successors.end(); succ++){
 
 					GraphNode* succNode = succ->first;
 					int succSCC = getSCCID(succNode);
 
-					// It's a DAG. No self loops!
+					// We are creating a DAG. Thus, no self loops allowed!
 					if (currentSCC != succSCC) {
-						GenericGraphNode<int>* succSCCNode = dagSCC.addNode(succSCC);
-						dagSCC.addEdge(currentSCCNode, succSCCNode, 1);
+
+						/*
+						 * Notice that the edge goes from the successor to the predecessor.
+						 */
+						dagSCC[succSCC].insert(currentSCC);
 					}
 
 				}
@@ -1296,20 +1300,37 @@ std::list<int> llvm::DepGraph::getSCCTopologicalOrder(){
 
 		}
 
-		assert (localSCCs.size() == dagSCC.getNumNodes() && "DAG of SCCs have a wrong number of nodes");
+		assert (localSCCs.size() == dagSCC.size() && "DAG of SCCs have a wrong number of nodes");
 
 		//Step 2: Compute topological order (greedy algorithm)
-		while ( dagSCC.getNumNodes() > 0  ) {
+		while ( dagSCC.size() > 0  ) {
 
-			GenericGraphNode<int>* currentNode = dagSCC.getFirstNodeWithoutPredecessors();
+			int currentNode = -1;
 
-			assert(currentNode && "DAG of SCCs have a cycle (it is not a valid DAG)!");
+			/*
+			 * Here we get the first node without predecessors
+			 */
+			std::map<int, std::set<int> >::iterator it, it_end;
+			for(it = dagSCC.begin(), it_end = dagSCC.end(); it != it_end; it++){
+				if (it->second.size() == 0) {
+					currentNode = it->first;
+					break;
+				}
+			}
 
-			int SCCID = **currentNode;
+			assert(currentNode>=0 && "DAG of SCCs have a cycle (it is not a valid DAG)!");
 
-			topologicalOrderedSCCs.push_back(SCCID);
+			topologicalOrderedSCCs.push_back(currentNode);
 
-			dagSCC.removeNode(currentNode);
+			/*
+			 * Here we remove this SCC from our DAG
+			 */
+			for(it = dagSCC.begin(), it_end = dagSCC.end(); it != it_end; it++){
+				if (it->second.count(currentNode)) {
+					it->second.erase(currentNode);
+				}
+			}
+			dagSCC.erase(currentNode);
 		}
 
 	}

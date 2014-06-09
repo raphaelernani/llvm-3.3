@@ -29,12 +29,12 @@ namespace llvm {
 
 class BranchAnalysis: public llvm::FunctionPass {
 private:
-	std::map<const Value*, std::list<ValueSwitchMap> > IntervalConstraints;
+	std::map<const Value*, std::list<ValueSwitchMap*> > IntervalConstraints;
 
 public:
 	static char ID;
 	BranchAnalysis(): FunctionPass(ID) {}
-	virtual ~BranchAnalysis() {}
+	virtual ~BranchAnalysis();
 
 	bool runOnFunction(Function &F);
 	virtual bool doInitialization(Module &M);
@@ -46,7 +46,7 @@ public:
 		AU.setPreservesAll();
 	}
 
-	std::map<const Value*, std::list<ValueSwitchMap> > getIntervalConstraints(){ return IntervalConstraints;};
+	std::map<const Value*, std::list<ValueSwitchMap*> > getIntervalConstraints(){ return IntervalConstraints;};
 
 };
 

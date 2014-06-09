@@ -403,7 +403,7 @@ private:
 		std::map<GraphNode*, int> reverseSCCMap;
 		std::list<int> topologicalOrderedSCCs;
 
-
+		bool isSigma(const PHINode* Phi);
 
 		AliasSets *AS;
 
@@ -412,7 +412,6 @@ private:
 
 public:
         typedef std::set<GraphNode*>::iterator iterator;
-
 
         std::set<GraphNode*>::iterator begin();
         std::set<GraphNode*>::iterator end();
@@ -576,8 +575,9 @@ public:
 
 		if (!hasNext()) return NULL;
 		GraphNode* result = *currentIt;
+		currentIt++;
 
-		for( DepGraph::iterator node_end = Graph->end();  currentIt != node_end; currentIt++ ){
+		for(DepGraph::iterator node_end = Graph->end();  currentIt != node_end; currentIt++ ){
 			GraphNode* current_node = *currentIt;
 			if(Graph->getSCCID(current_node) == SCCID){
 				break;

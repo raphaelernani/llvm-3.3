@@ -80,16 +80,13 @@ void BranchAnalysis::buildValueSwitchMap(const SwitchInst *sw) {
 
 	}
 
-
-
-	ValueSwitchMap VSM(condition, BBsuccs);
+	ValueSwitchMap* VSM = new ValueSwitchMap(condition, BBsuccs);
 	//valuesSwitchMap.insert(std::make_pair(condition, VSM));
 
 	IntervalConstraints[condition].push_back(VSM);
 
-
 	if (Op0_0) {
-		ValueSwitchMap VSM_0(Op0_0, BBsuccs);
+		ValueSwitchMap* VSM_0 = new ValueSwitchMap(Op0_0, BBsuccs);
 		IntervalConstraints[Op0_0].push_back(VSM_0);
 	}
 }
@@ -117,6 +114,7 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 
 	// We have a Variable-Constant comparison.
 	if (ConstantInt * CI = dyn_cast<ConstantInt>(ici->getOperand(1))) {
+
 		// Calculate the range of values that would satisfy the comparison.
 		ConstantRange CR(CI->getValue(), CI->getValue() + 1);
 		unsigned int pred = ici->getPredicate();
@@ -160,8 +158,10 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		BasicInterval* BT = new BasicInterval(TValues);
 		BasicInterval* BF = new BasicInterval(FValues);
 
+		errs() << br << " " << BT << " " << BF << "\n";
+
 		const Value *Op0 = ici->getOperand(0);
-		ValueBranchMap VBM(Op0, TBlock, FBlock, BT, BF);
+		ValueBranchMap* VBM = new ValueBranchMap(Op0, TBlock, FBlock, BT, BF);
 
 		IntervalConstraints[Op0].push_back(VBM);
 		//valuesBranchMap.insert(std::make_pair(Op0, VBM));
@@ -174,7 +174,7 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 			BasicInterval* BT = new BasicInterval(TValues);
 			BasicInterval* BF = new BasicInterval(FValues);
 
-			ValueBranchMap VBM(Op0_0, TBlock, FBlock, BT, BF);
+			ValueBranchMap* VBM = new ValueBranchMap(Op0_0, TBlock, FBlock, BT, BF);
 
 			IntervalConstraints[Op0_0].push_back(VBM);
 			//valuesBranchMap.insert(std::make_pair(Op0_0, VBM));
@@ -193,7 +193,9 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		SymbInterval* STOp0 = new SymbInterval(CR, Op1, pred);
 		SymbInterval* SFOp0 = new SymbInterval(CR, Op1, invPred);
 
-		ValueBranchMap VBMOp0(Op0, TBlock, FBlock, STOp0, SFOp0);
+		errs() << br << " " << STOp0 << " " << SFOp0 << "\n";
+
+		ValueBranchMap* VBMOp0 = new ValueBranchMap(Op0, TBlock, FBlock, STOp0, SFOp0);
 		IntervalConstraints[Op0].push_back(VBMOp0);
 		//valuesBranchMap.insert(std::make_pair(Op0, VBMOp0));
 
@@ -205,7 +207,9 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 			SymbInterval* STOp1_1 = new SymbInterval(CR, Op1, pred);
 			SymbInterval* SFOp1_1 = new SymbInterval(CR, Op1, invPred);
 
-			ValueBranchMap VBMOp1_1(Op0_0, TBlock, FBlock, STOp1_1, SFOp1_1);
+			errs() << br << " " << STOp1_1 << " " << SFOp1_1 << "\n";
+
+			ValueBranchMap* VBMOp1_1 = new ValueBranchMap(Op0_0, TBlock, FBlock, STOp1_1, SFOp1_1);
 			IntervalConstraints[Op0_0].push_back(VBMOp1_1);
 			//valuesBranchMap.insert(std::make_pair(Op0_0, VBMOp1_1));
 		}
@@ -213,7 +217,10 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		// Symbolic intervals for op1
 		SymbInterval* STOp1 = new SymbInterval(CR, Op0, invPred);
 		SymbInterval* SFOp1 = new SymbInterval(CR, Op0, pred);
-		ValueBranchMap VBMOp1(Op1, TBlock, FBlock, STOp1, SFOp1);
+
+		errs() << br << " " << STOp1 << " " << SFOp1 << "\n";
+
+		ValueBranchMap* VBMOp1 = new ValueBranchMap(Op1, TBlock, FBlock, STOp1, SFOp1);
 		IntervalConstraints[Op1].push_back(VBMOp1);
 		//valuesBranchMap.insert(std::make_pair(Op1, VBMOp1));
 
@@ -225,7 +232,9 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 			SymbInterval* STOp1_1 = new SymbInterval(CR, Op1, pred);
 			SymbInterval* SFOp1_1 = new SymbInterval(CR, Op1, invPred);
 
-			ValueBranchMap VBMOp1_1(Op0_0, TBlock, FBlock, STOp1_1, SFOp1_1);
+			errs() << br << " " << STOp1_1 << " " << SFOp1_1 << "\n";
+
+			ValueBranchMap* VBMOp1_1 = new ValueBranchMap(Op0_0, TBlock, FBlock, STOp1_1, SFOp1_1);
 			IntervalConstraints[Op0_0].push_back(VBMOp1_1);
 			//valuesBranchMap.insert(std::make_pair(Op0_0, VBMOp1_1));
 		}
@@ -240,6 +249,20 @@ bool BranchAnalysis::doInitialization(Module &M){
 
 	//We do not change the program; return false
 	return false;
+}
+
+BranchAnalysis::~BranchAnalysis(){
+
+	std::map<const Value*, std::list<ValueSwitchMap*> >::iterator it, it_end;
+
+	for(it = IntervalConstraints.begin(), it_end = IntervalConstraints.end(); it != it_end; it++){
+
+		std::list<ValueSwitchMap*>::iterator l_it, l_end;
+		for(l_it = it->second.begin(), l_end = it->second.end(); l_it != l_end; l_it++){
+			ValueSwitchMap* VSM = *l_it;
+			delete VSM;
+		}
+	}
 }
 
 bool BranchAnalysis::runOnFunction(Function& F){

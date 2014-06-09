@@ -21,9 +21,14 @@ void llvm::RangeAnalysis::solve() {
 
 		int SCCid = *SCCit;
 
+		errs() << "processing SCC " << SCCid << "\nWidening...";
+
 		growthAnalysis(SCCid);
+		errs() << " done\nFutures...";
 		fixFutures(SCCid);
+		errs() << " done\nNarrowing...";
 		narrowingAnalysis(SCCid);
+		errs() << " done\n";
 
 	}
 
@@ -151,7 +156,7 @@ Range llvm::RangeAnalysis::abstractInterpretation(Range Op1, Range Op2, Instruct
 /*
  * Abstract interpretation of unary operators
  */
-Range abstractInterpretation(Range Op1, Instruction *I){
+Range llvm::RangeAnalysis::abstractInterpretation(Range Op1, Instruction *I){
 
 	unsigned bw = I->getType()->getPrimitiveSizeInBits();
 	Range result(Min, Max, Unknown);
@@ -310,7 +315,7 @@ void llvm::RangeAnalysis::fixFutures(int SCCid) {
 
 			if (branchConstraints.count(Node) > 0) {
 
-				if (SymbInterval* SI = dyn_cast<SymbInterval>(&(branchConstraints[Node]))) {
+				if (SymbInterval* SI = dyn_cast<SymbInterval>(branchConstraints[Node])) {
 
 					GraphNode* ControlDep = Node->getOperand(0, etControl);
 
@@ -335,51 +340,67 @@ void llvm::RangeAnalysis::narrowingAnalysis(int SCCid) {
 }
 
 void llvm::RangeAnalysis::addConstraints(
-		std::map<const Value*, std::list<ValueSwitchMap> > constraints) {
+		std::map<const Value*, std::list<ValueSwitchMap*> > constraints) {
 
 	//First we iterate through the constraints
-	std::map<const Value*, std::list<ValueSwitchMap> >::iterator Cit, Cend;
+	std::map<const Value*, std::list<ValueSwitchMap*> >::iterator Cit, Cend;
 	for(Cit = constraints.begin(), Cend = constraints.end(); Cit != Cend; Cit++){
 
 		const Value* CurrentValue = Cit->first;
 
 		// For each value, we iterate through its uses, looking for sigmas. We
-		// can only learn with conditionals when we insert sigmas, splitting the
+		// can only learn with conditionals when we insert sigmas, because they split the
 		// live ranges of the variables according to the branch results.
 
 		Value::const_use_iterator Uit, Uend;
 		for(Uit = CurrentValue->use_begin(), Uend = CurrentValue->use_end(); Uit != Uend; Uit++){
 
 			const User* U = *Uit;
+			if (!U) continue;
+
 			if (const PHINode* CurrentUse = dyn_cast<const PHINode>(U)){
 
-				if(isSigma(CurrentUse)){
+				if(SigmaOpNode* CurrentSigmaOpNode = dyn_cast<SigmaOpNode>(depGraph->findOpNode(CurrentUse))){
 
-					SigmaOpNode* CurrentSigmaOpNode = dyn_cast<SigmaOpNode>(depGraph->findOpNode(CurrentUse));
-					if(!CurrentSigmaOpNode) continue;
+					errs() << "Value: " << *CurrentValue
+							<< "Sigma: " << *CurrentUse << "\n";
+
 
 					const BasicBlock* ParentBB = CurrentUse->getParent();
 
 					// We will look for the symbolic range of the basic block of this sigma node.
-					std::list<ValueSwitchMap>::iterator VSMit, VSMend;
+					std::list<ValueSwitchMap*>::iterator VSMit, VSMend;
 					for(VSMit = Cit->second.begin(), VSMend = Cit->second.end(); VSMit != VSMend; VSMit++){
 
-						ValueSwitchMap* CurrentVSM = &(*VSMit);
-
+						ValueSwitchMap* CurrentVSM = *VSMit;
 						int Idx = CurrentVSM->getBBid(ParentBB);
 						if(Idx >= 0){
+
+							errs() << "Vai Adicionar sigma à lista de BranchConstraints\n";
 
 							//Save the symbolic interval of the opNode. We will use it in the narrowing
 							// phase of the range analysis
 							BasicInterval* BI = CurrentVSM->getItv(Idx);
-							branchConstraints[CurrentSigmaOpNode] = *BI;
+							branchConstraints[CurrentSigmaOpNode] = BI;
+
+							errs() << "Adicionou sigma à lista de BranchConstraints\n";
+
+							errs() << BI << "\n";
+
+							BI->print(errs());
+							errs() << "Imprimiu\n";
 
 							//If it is a symbolic interval, then we have a future value and we must
 							//insert a control dependence edge in the graph.
 							if(SymbInterval* SI = dyn_cast<SymbInterval>(BI)){
+
+								errs() << "Vai aficionar aresta de dependência de controle\n";
+
 								if (GraphNode* FutureValue = depGraph->findNode(SI->getBound())) {
 									depGraph->addEdge(FutureValue, CurrentSigmaOpNode, etControl);
 								}
+
+
 							}
 
 							break;
@@ -406,6 +427,9 @@ void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 	while(it.hasNext()){
 
 		GraphNode* node = it.getNext();
+
+		errs() << node << "\n";
+
 		out_state[node] = Range(Min, Max, Unknown);
 
 		std::map<GraphNode*, edgeType> preds = node->getPredecessors();
@@ -426,6 +450,8 @@ void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 	}
 
 	while(worklist.size() > 0){
+
+		errs() << "Worklist.size = " << worklist.size() << "\n";
 
 		GraphNode* currentNode = *(worklist.begin());
 		worklist.erase(currentNode);
@@ -458,7 +484,7 @@ bool IntraProceduralRA::runOnFunction(Function& F) {
 
 	//Extract constraints from branch conditions
 	BranchAnalysis& brAnalysis = getAnalysis<BranchAnalysis>();
-	std::map<const Value*, std::list<ValueSwitchMap> > constraints = brAnalysis.getIntervalConstraints();
+	std::map<const Value*, std::list<ValueSwitchMap*> > constraints = brAnalysis.getIntervalConstraints();
 
 	//Add branch information to the dependence graph. Here we add the future values
 	addConstraints(constraints);
@@ -483,21 +509,54 @@ bool InterProceduralRA::runOnModule(Module& M) {
 	moduleDepGraph& M_DepGraph = getAnalysis<moduleDepGraph>();
 	depGraph = M_DepGraph.depGraph;
 
+	errs() << "Criou Grafo\n";
+
 	for(Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; Fit++){
 
 		//Skip functions without body (externally linked functions, such as printf)
 		if (Fit->begin() == Fit->end()) continue;
 
+		errs() << "vai adicionar constraints da função " << Fit->getName() <<  "\n";
+
 		//Extract constraints from branch conditions
 		BranchAnalysis& brAnalysis = getAnalysis<BranchAnalysis>(*Fit);
-		std::map<const Value*, std::list<ValueSwitchMap> > constraints = brAnalysis.getIntervalConstraints();
+		std::map<const Value*, std::list<ValueSwitchMap*> > constraints = brAnalysis.getIntervalConstraints();
+
+		errs() << "Buscou constraints\n";
 
 		//Add branch information to the dependence graph. Here we add the future values
 		addConstraints(constraints);
+
+		errs() << "aplicou constraints\n";
+
 	}
+
+	errs() << "Adicionou todas as Constraints\n";
 
 	//Solve range analysis
 	solve();
+
+
+	errs() << "Computed ranges:\n";
+
+	for(Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; Fit++){
+
+		for (Function::iterator BBit = Fit->begin(), BBend = Fit->end(); BBit != BBend; BBit++){
+
+			for (BasicBlock::iterator Iit = BBit->begin(), Iend = BBit->end(); Iit != Iend; Iit++){
+
+				Instruction* I = Iit;
+
+				Range R = getRange(I);
+
+				errs() << *I << "	";
+				R.print(errs());
+				errs() << "\n";
+			}
+
+		}
+	}
+
 
 	return false;
 }

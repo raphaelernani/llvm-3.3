@@ -13,9 +13,16 @@
 // ========================================================================== //
 
 ValueSwitchMap::ValueSwitchMap(const Value* V,
-		SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4> &BBsuccs) :
-		V(V), BBsuccs(BBsuccs) {
+		SmallVector<std::pair<BasicInterval*, const BasicBlock*>, 4> BBsuccs) :
+		V(V) {
+
+	errs() << "V:" << *V << "\n";
+	errs() << "BBsuccs.size() = " << BBsuccs.size() << "\n";
+
 	for (unsigned i = 0, e = BBsuccs.size(); i < e; ++i) {
+		this->BBsuccs.push_back(BBsuccs[i]);
+
+		errs() << "i = " << i << "\n";
 		BBids[this->BBsuccs[i].second] = i;
 	}
 }
@@ -40,15 +47,22 @@ void ValueSwitchMap::clear() {
 
 ValueBranchMap::ValueBranchMap(const Value* V, const BasicBlock* BBTrue,
 		const BasicBlock* BBFalse, BasicInterval* ItvT, BasicInterval* ItvF) :
-		ValueSwitchMap(V, VBM_BBsuccs){
+		ValueSwitchMap(V){
+
+	errs() << ItvF << " - ";
+	ItvF->print(errs());
+	errs() << "\n";
 
 	//False ==> index 0
+	BBids[BBFalse] = 0;
 	BBsuccs.push_back(std::pair<BasicInterval*, const BasicBlock*>(ItvF,BBFalse));
 
 	//True ==> index 1
+	BBids[BBTrue] = 1;
 	BBsuccs.push_back(std::pair<BasicInterval*, const BasicBlock*>(ItvT,BBTrue));
 
 }
 
 ValueBranchMap::~ValueBranchMap() {
+
 }
