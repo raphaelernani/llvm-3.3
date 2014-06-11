@@ -7,9 +7,8 @@
 
 #include "RangeAnalysis.h"
 
-namespace llvm {
+bool enable_debug;
 
-} /* namespace llvm */
 
 void llvm::RangeAnalysis::solve() {
 
@@ -21,14 +20,16 @@ void llvm::RangeAnalysis::solve() {
 
 		int SCCid = *SCCit;
 
-		errs() << "processing SCC " << SCCid << "\nWidening...";
+		depGraph->printSCC(SCCid, errs());
+
+		enable_debug = (SCCid == 0);
 
 		growthAnalysis(SCCid);
-		errs() << " done\nFutures...";
 		fixFutures(SCCid);
-		errs() << " done\nNarrowing...";
 		narrowingAnalysis(SCCid);
-		errs() << " done\n";
+
+		printSCCState(SCCid);
+		errs() << "\n";
 
 	}
 
@@ -53,6 +54,7 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 
 		if (ConstantInt* CI = dyn_cast<ConstantInt>(val)){
 			APInt value = CI->getValue();
+			value = value.sextOrTrunc(MAX_BIT_INT);
 			result = Range(value,value);
 		} else {
 			result = getUnionOfPredecessors(Node);
@@ -63,7 +65,8 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 	 * Nodes that do not modify the data: PHI, Sigma, MemNode
 	 * >> Just forward the state to the next node.
 	 */
-	else if (isa<MemNode>(Node) || isa<SigmaOpNode>(Node) || isa<PHIOpNode>(Node) ) {
+	else if (isa<MemNode>(Node) || isa<SigmaOpNode>(Node) || isa<PHIOpNode>(Node) || ( isa<OpNode>(Node) && dyn_cast<OpNode>(Node)->getOpCode() == Instruction::PHI ) ) {
+
 		result = getUnionOfPredecessors(Node);
 	}
 	/*
@@ -71,6 +74,7 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 	 * >> [-inf, +inf]
 	 */
 	else if (isa<CallNode>(Node)) {
+
 		result = Range(Min, Max);
 	}
 	/*
@@ -79,8 +83,14 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 	 */
 	else if (BinaryOpNode* BOP = dyn_cast<BinaryOpNode>(Node)) {
 
-		GraphNode* Op1 = BOP->getOperand(0);
-		GraphNode* Op2 = BOP->getOperand(1);
+		GraphNode* Op1 = BOP->getOperand(0, etData);
+		GraphNode* Op2 = BOP->getOperand(1, etData);
+
+		errs() << "  Op1:" << Op1->getLabel();
+		out_state[Op1].print(errs());
+
+		errs() << "; Op2:" << Op2->getLabel();
+		out_state[Op2].print(errs());
 
 		result = abstractInterpretation(out_state[Op1], out_state[Op2], BOP->getBinaryOperator());
 	}
@@ -99,15 +109,18 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 	 */
 	else if (OpNode* OP = dyn_cast<OpNode>(Node)) {
 
-		Instruction* I = OP->getOperation();
+		if (Instruction* I = OP->getOperation()) {
 
-		switch (I->getOpcode()) {
-		case Instruction::Store:
-			GraphNode* Op = OP->getOperand(0);
-			result = abstractInterpretation(out_state[Op], I);
-			break;
+			switch (I->getOpcode()) {
+			case Instruction::Store:
+				GraphNode* Op = OP->getOperand(0);
+				result = abstractInterpretation(out_state[Op], I);
+				break;
+			}
 		}
 
+	} else {
+		result = Range();
 	}
 
 	return result;
@@ -132,6 +145,10 @@ Range llvm::RangeAnalysis::getUnionOfPredecessors(GraphNode* Node){
  * Abstract interpretation of binary operators
  */
 Range llvm::RangeAnalysis::abstractInterpretation(Range Op1, Range Op2, Instruction *I){
+
+	if (Op1.isUnknown() || Op2.isUnknown()) {
+		return Range(Min, Max, Unknown);
+	}
 
 	switch(I->getOpcode()){
 		case Instruction::Add:  return Op1.add(Op2);
@@ -208,25 +225,40 @@ void fixPointIteration(int SCCid, bool(*latticeOperation)(GraphNode*, Range)){
  */
 void llvm::RangeAnalysis::computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist, LatticeOperation lo){
 
+	errs() << "Evaluating node " << Node->getLabel() << "... ";
+
 	Range new_out_state = evaluateNode(Node);
+
+	errs() << "Result: ";
+	new_out_state.print(errs());
+	errs() <<"\n Meet/Join... ";
 
 	bool hasChanged = (lo == loJoin ? join(Node, new_out_state) : meet(Node, new_out_state));
 
+	errs() << "Result: ";
+	out_state[Node].print(errs());
+
+
 	if (hasChanged) {
+		errs() << " * ";
+
 		//The range of this node has changed. Add its successors to the worklist.
 		addSuccessorsToWorklist(Node, Worklist);
 	}
 
+	errs() <<"\n";
 }
 
 void llvm::RangeAnalysis::addSuccessorsToWorklist(GraphNode* Node, std::set<GraphNode*> &Worklist){
+
+	int SCCid = depGraph->getSCCID(Node);
 
 	std::map<GraphNode*, edgeType> succs = Node->getSuccessors();
 
 	std::map<GraphNode*, edgeType>::iterator succ, succ_end;
 	for(succ = succs.begin(), succ_end = succs.end(); succ != succ_end; succ++){
 
-		if(succ->second == etData){
+		if(depGraph->getSCCID(succ->first) == SCCid  && succ->second == etData){
 			Worklist.insert(succ->first);
 		}
 	}
@@ -362,10 +394,6 @@ void llvm::RangeAnalysis::addConstraints(
 
 				if(SigmaOpNode* CurrentSigmaOpNode = dyn_cast<SigmaOpNode>(depGraph->findOpNode(CurrentUse))){
 
-					errs() << "Value: " << *CurrentValue
-							<< "Sigma: " << *CurrentUse << "\n";
-
-
 					const BasicBlock* ParentBB = CurrentUse->getParent();
 
 					// We will look for the symbolic range of the basic block of this sigma node.
@@ -375,31 +403,18 @@ void llvm::RangeAnalysis::addConstraints(
 						ValueSwitchMap* CurrentVSM = *VSMit;
 						int Idx = CurrentVSM->getBBid(ParentBB);
 						if(Idx >= 0){
-
-							errs() << "Vai Adicionar sigma à lista de BranchConstraints\n";
-
 							//Save the symbolic interval of the opNode. We will use it in the narrowing
 							// phase of the range analysis
 							BasicInterval* BI = CurrentVSM->getItv(Idx);
 							branchConstraints[CurrentSigmaOpNode] = BI;
 
-							errs() << "Adicionou sigma à lista de BranchConstraints\n";
-
-							errs() << BI << "\n";
-
-							BI->print(errs());
-							errs() << "Imprimiu\n";
-
 							//If it is a symbolic interval, then we have a future value and we must
 							//insert a control dependence edge in the graph.
 							if(SymbInterval* SI = dyn_cast<SymbInterval>(BI)){
 
-								errs() << "Vai aficionar aresta de dependência de controle\n";
-
 								if (GraphNode* FutureValue = depGraph->findNode(SI->getBound())) {
 									depGraph->addEdge(FutureValue, CurrentSigmaOpNode, etControl);
 								}
-
 
 							}
 
@@ -418,17 +433,34 @@ void llvm::RangeAnalysis::addConstraints(
 
 }
 
+void llvm::RangeAnalysis::printSCCState(int SCCid){
+
+	SCC_Iterator it(depGraph, SCCid);
+
+	while(it.hasNext()){
+
+		GraphNode* node = it.getNext();
+
+		errs() << node->getLabel() << "	";
+		out_state[node].print(errs());
+		errs() << "\n";
+
+	}
+}
+
 void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 
 	SCC_Iterator it(depGraph, SCCid);
 
 	std::set<GraphNode*> worklist;
 
+	std::list<GraphNode*> currentSCC;
+
 	while(it.hasNext()){
 
 		GraphNode* node = it.getNext();
 
-		errs() << node << "\n";
+		if (lo == loJoin) currentSCC.push_back(node);
 
 		out_state[node] = Range(Min, Max, Unknown);
 
@@ -451,8 +483,6 @@ void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 
 	while(worklist.size() > 0){
 
-		errs() << "Worklist.size = " << worklist.size() << "\n";
-
 		GraphNode* currentNode = *(worklist.begin());
 		worklist.erase(currentNode);
 
@@ -460,6 +490,73 @@ void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 
 	}
 
+	if (lo == loJoin){
+		for(std::list<GraphNode*>::iterator it = currentSCC.begin(), iend = currentSCC.end(); it != iend; it++){
+			GraphNode* currentNode = *it;
+
+			if(out_state[currentNode].isUnknown()){
+				out_state[currentNode] = Range(Min, Max);
+			}
+
+		}
+	}
+
+}
+
+unsigned llvm::RangeAnalysis::getMaxBitWidth(Module& M) {
+	unsigned max = 0;
+	// Search through the functions for the max int bitwidth
+	for (Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; ++Fit) {
+		if (!Fit->isDeclaration()) {
+			unsigned bitwidth = RangeAnalysis::getMaxBitWidth(*Fit);
+
+			if (bitwidth > max)
+				max = bitwidth;
+		}
+	}
+	return max;
+}
+
+unsigned llvm::RangeAnalysis::getMaxBitWidth(Function& F) {
+
+	unsigned int InstBitSize = 0, opBitSize = 0, max = 0;
+
+	// Obtains the maximum bit width of the instructions of the function.
+	for (Function::iterator BBit = F.begin(), BBend = F.end(); BBit != BBend; BBit++){
+
+		for (BasicBlock::iterator Iit = BBit->begin(), Iend = BBit->end(); Iit != Iend;  Iit++){
+
+			Instruction* I = Iit;
+
+			InstBitSize = I->getType()->getPrimitiveSizeInBits();
+			if (I->getType()->isIntegerTy() && InstBitSize > max) {
+				max = InstBitSize;
+			}
+
+			// Obtains the maximum bit width of the operands of the instruction.
+			User::const_op_iterator bgn = I->op_begin(), end = I->op_end();
+			for (; bgn != end; ++bgn) {
+				opBitSize = (*bgn)->getType()->getPrimitiveSizeInBits();
+				if ((*bgn)->getType()->isIntegerTy() && opBitSize > max) {
+					max = opBitSize;
+				}
+			}
+
+		}
+
+	}
+
+	// Bitwidth equal to 0 is not valid, so we increment to 1
+	if (max == 0) ++max;
+
+	return max;
+}
+
+void llvm::RangeAnalysis::updateMinMax(unsigned maxBitWidth) {
+	// Updates the Min and Max values.
+	Min = APInt::getSignedMinValue(maxBitWidth);
+	Max = APInt::getSignedMaxValue(maxBitWidth);
+	Zero = APInt(MAX_BIT_INT, 0, true);
 }
 
 Range llvm::RangeAnalysis::getRange(Value* V) {
@@ -468,7 +565,7 @@ Range llvm::RangeAnalysis::getRange(Value* V) {
 		return out_state[Node];
 
 	//Value not found. Return [-inf,+inf]
-	errs() << "Requesting range for unknown value: " << V << "\n";
+	//errs() << "Requesting range for unknown value: " << V << "\n";
 	return Range();
 }
 
@@ -477,6 +574,9 @@ Range llvm::RangeAnalysis::getRange(Value* V) {
  *************************************************************************/
 
 bool IntraProceduralRA::runOnFunction(Function& F) {
+
+	MAX_BIT_INT = getMaxBitWidth(F);
+	updateMinMax(MAX_BIT_INT);
 
 	//Build intra-procedural dependence graph
 	functionDepGraph& M_DepGraph = getAnalysis<functionDepGraph>();
@@ -505,33 +605,27 @@ static RegisterPass<IntraProceduralRA> X("ra-intra",
 
 bool InterProceduralRA::runOnModule(Module& M) {
 
+	MAX_BIT_INT = getMaxBitWidth(M);
+	updateMinMax(MAX_BIT_INT);
+
 	//Build inter-procedural dependence graph
 	moduleDepGraph& M_DepGraph = getAnalysis<moduleDepGraph>();
 	depGraph = M_DepGraph.depGraph;
 
-	errs() << "Criou Grafo\n";
 
 	for(Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; Fit++){
 
 		//Skip functions without body (externally linked functions, such as printf)
 		if (Fit->begin() == Fit->end()) continue;
 
-		errs() << "vai adicionar constraints da função " << Fit->getName() <<  "\n";
-
 		//Extract constraints from branch conditions
 		BranchAnalysis& brAnalysis = getAnalysis<BranchAnalysis>(*Fit);
 		std::map<const Value*, std::list<ValueSwitchMap*> > constraints = brAnalysis.getIntervalConstraints();
 
-		errs() << "Buscou constraints\n";
-
 		//Add branch information to the dependence graph. Here we add the future values
 		addConstraints(constraints);
 
-		errs() << "aplicou constraints\n";
-
 	}
-
-	errs() << "Adicionou todas as Constraints\n";
 
 	//Solve range analysis
 	solve();
@@ -549,7 +643,7 @@ bool InterProceduralRA::runOnModule(Module& M) {
 
 				Range R = getRange(I);
 
-				errs() << *I << "	";
+				errs() << I->getName() << "	";
 				R.print(errs());
 				errs() << "\n";
 			}

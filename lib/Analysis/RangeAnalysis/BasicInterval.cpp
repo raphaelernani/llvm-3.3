@@ -27,7 +27,6 @@ BasicInterval::BasicInterval(const APInt& l, const APInt& u) :
 
 // This is a base class, its dtor must be virtual.
 BasicInterval::~BasicInterval() {
-	errs() << "BasicInterval Destructor\n";
 }
 
 /// Pretty print.

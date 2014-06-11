@@ -51,6 +51,8 @@ private:
 	bool join(GraphNode* Node, Range new_abstract_state);
 	bool meet(GraphNode* Node, Range new_abstract_state);
 
+	void printSCCState(int SCCid);
+
 
 protected:
 	void solve();
@@ -58,6 +60,10 @@ protected:
 
 public:
 	DepGraph* depGraph;
+
+	static unsigned getMaxBitWidth(Module &M);
+	static unsigned getMaxBitWidth(Function &F);
+	static void updateMinMax(unsigned maxBitWidth);
 
 	RangeAnalysis(): depGraph(NULL) {};
 	virtual ~RangeAnalysis() {};
@@ -81,6 +87,8 @@ public:
         AU.setPreservesAll();
     }
 
+
+
     bool runOnFunction(Function &F);
 };
 
@@ -95,6 +103,8 @@ public:
         AU.addRequired<BranchAnalysis> ();
         AU.setPreservesAll();
     }
+
+
 
     bool runOnModule(Module &M);
 };

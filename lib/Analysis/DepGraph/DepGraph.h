@@ -43,7 +43,7 @@ typedef enum {
         etData = 0, etControl = 1
 } edgeType;
 
-enum NodeClassId {
+typedef enum {
 	GraphNodeId,
 	VarNodeId,
 	OpNodeId,
@@ -53,7 +53,7 @@ enum NodeClassId {
 	UnaryOpNodeId,
 	SigmaOpNodeId,
 	PHIOpNodeId
-};
+} NodeClassId;
 
 /*
  * Class GraphNode
@@ -77,7 +77,7 @@ private:
         int ID;
 
 protected:
-        int Class_ID;
+        NodeClassId Class_ID;
         std::map<GraphNode*, edgeType> successors;
         std::map<GraphNode*, edgeType> predecessors;
 public:
@@ -99,7 +99,7 @@ public:
         void connect(GraphNode* dst, edgeType type = etData);
         void disconnect(GraphNode* dst);
 
-        int getClass_Id() const;
+        NodeClassId getClass_Id() const;
         int getId() const;
         std::string getName();
         virtual std::string getLabel() = 0;
@@ -107,6 +107,8 @@ public:
         virtual std::string getStyle();
 
         virtual llvm::raw_ostream& dump(llvm::raw_ostream &strm);
+
+        static std::string getClassName(NodeClassId classID);
 
         virtual GraphNode* clone() = 0;
 };
@@ -522,6 +524,8 @@ public:
 
         int getSCCID(GraphNode* node);
         std::set<GraphNode*> getSCC(int ID);
+
+        void printSCC(int SCCid, raw_ostream& OS);
 
         void dumpSCCs();
 

@@ -19,7 +19,6 @@ SymbInterval::SymbInterval(const Range& range, const Value* bound,
 }
 
 SymbInterval::~SymbInterval() {
-	errs() << "SymbInterval Destructor\n";
 }
 
 void SymbInterval::fixIntersects(Range boundRange) {

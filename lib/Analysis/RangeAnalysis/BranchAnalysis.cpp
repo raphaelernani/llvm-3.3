@@ -158,8 +158,6 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		BasicInterval* BT = new BasicInterval(TValues);
 		BasicInterval* BF = new BasicInterval(FValues);
 
-		errs() << br << " " << BT << " " << BF << "\n";
-
 		const Value *Op0 = ici->getOperand(0);
 		ValueBranchMap* VBM = new ValueBranchMap(Op0, TBlock, FBlock, BT, BF);
 
@@ -193,8 +191,6 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		SymbInterval* STOp0 = new SymbInterval(CR, Op1, pred);
 		SymbInterval* SFOp0 = new SymbInterval(CR, Op1, invPred);
 
-		errs() << br << " " << STOp0 << " " << SFOp0 << "\n";
-
 		ValueBranchMap* VBMOp0 = new ValueBranchMap(Op0, TBlock, FBlock, STOp0, SFOp0);
 		IntervalConstraints[Op0].push_back(VBMOp0);
 		//valuesBranchMap.insert(std::make_pair(Op0, VBMOp0));
@@ -207,8 +203,6 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 			SymbInterval* STOp1_1 = new SymbInterval(CR, Op1, pred);
 			SymbInterval* SFOp1_1 = new SymbInterval(CR, Op1, invPred);
 
-			errs() << br << " " << STOp1_1 << " " << SFOp1_1 << "\n";
-
 			ValueBranchMap* VBMOp1_1 = new ValueBranchMap(Op0_0, TBlock, FBlock, STOp1_1, SFOp1_1);
 			IntervalConstraints[Op0_0].push_back(VBMOp1_1);
 			//valuesBranchMap.insert(std::make_pair(Op0_0, VBMOp1_1));
@@ -217,8 +211,6 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		// Symbolic intervals for op1
 		SymbInterval* STOp1 = new SymbInterval(CR, Op0, invPred);
 		SymbInterval* SFOp1 = new SymbInterval(CR, Op0, pred);
-
-		errs() << br << " " << STOp1 << " " << SFOp1 << "\n";
 
 		ValueBranchMap* VBMOp1 = new ValueBranchMap(Op1, TBlock, FBlock, STOp1, SFOp1);
 		IntervalConstraints[Op1].push_back(VBMOp1);
@@ -231,8 +223,6 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 
 			SymbInterval* STOp1_1 = new SymbInterval(CR, Op1, pred);
 			SymbInterval* SFOp1_1 = new SymbInterval(CR, Op1, invPred);
-
-			errs() << br << " " << STOp1_1 << " " << SFOp1_1 << "\n";
 
 			ValueBranchMap* VBMOp1_1 = new ValueBranchMap(Op0_0, TBlock, FBlock, STOp1_1, SFOp1_1);
 			IntervalConstraints[Op0_0].push_back(VBMOp1_1);

@@ -88,7 +88,7 @@ void llvm::GraphNode::disconnect(GraphNode* dst) {
 }
 
 
-int llvm::GraphNode::getClass_Id() const {
+NodeClassId llvm::GraphNode::getClass_Id() const {
         return Class_ID;
 }
 
@@ -125,6 +125,21 @@ llvm::raw_ostream& GraphNode::dump(llvm::raw_ostream &strm){
 //llvm::raw_ostream& operator<<(llvm::raw_ostream &strm, GraphNode &a) {
 //  return a.dump(strm);
 //}
+
+std::string llvm::GraphNode::getClassName(NodeClassId classID) {
+	switch(classID){
+	case GraphNodeId: return "GraphNode";
+	case VarNodeId: return "VarNode";
+	case OpNodeId: return "OpNode";
+	case CallNodeId: return "CallNode";
+	case MemNodeId: return "MemNode";
+	case BinaryOpNodeId: return "BinaryOpNode";
+	case UnaryOpNodeId: return "UnaryOpNode";
+	case SigmaOpNodeId: return "SigmaOpNode";
+	case PHIOpNodeId: return "PHIOpNode";
+	}
+	return "Unknown Class";
+}
 
 int llvm::GraphNode::currentID = 0;
 
@@ -164,7 +179,7 @@ GraphNode* llvm::OpNode::getOperand(unsigned int index, edgeType et){
 	GraphNode* result = NULL;
 
 	std::map<GraphNode*, edgeType>::iterator pred, pred_end;
-	for(pred = predecessors.begin(), pred_end = predecessors.end(); pred != pred_end && index > 0; pred++){
+	for(pred = predecessors.begin(), pred_end = predecessors.end(); pred != pred_end && index >= 0; pred++){
 
 		if(pred->second == et){
 
@@ -1231,6 +1246,21 @@ void llvm::DepGraph::recomputeSCCs(){
 
 }
 
+void llvm::DepGraph::printSCC(int SCCid, raw_ostream& OS){
+
+	OS << "SCC " << SCCid << " {\n";
+
+	for(std::set<GraphNode*>::iterator it = sCCs[SCCid].begin(); it != sCCs[SCCid].end(); it++){
+		GraphNode* Node = *it;
+		OS <<  "	" <<  Node->getLabel() << ": "
+				      << GraphNode::getClassName(Node->getClass_Id())
+		              << " [ ID = "<< Node->getId() << " ]\n";
+	}
+	OS << "} \n";
+
+}
+
+
 void llvm::DepGraph::dumpSCCs(){
 
 	errs() << "\nSCCs\n";
@@ -1272,7 +1302,8 @@ std::list<int> llvm::DepGraph::getSCCTopologicalOrder(){
 
 			int currentSCC = it->first;
 
-			dagSCC[currentSCC].clear();
+			//just to make sure it will be in the map
+			dagSCC[currentSCC];
 
 			//... iterate over its nodes...
 			for ( std::set<GraphNode*>::iterator node = it->second.begin(); node != it->second.end(); node++ ){
@@ -1760,4 +1791,5 @@ static RegisterPass<moduleDepGraph> Y("moduleDepGraph",
 char ViewModuleDepGraph::ID = 0;
 static RegisterPass<ViewModuleDepGraph> Z("view-depgraph",
 		"View Module Dependence Graph");
+
 
