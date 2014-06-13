@@ -26,6 +26,9 @@ void llvm::RangeAnalysis::solve() {
 
 		growthAnalysis(SCCid);
 		fixFutures(SCCid);
+
+		errs() << "\n\n\n========= NARROWING ========\n\n";
+
 		narrowingAnalysis(SCCid);
 
 		printSCCState(SCCid);
@@ -280,21 +283,37 @@ bool llvm::RangeAnalysis::join(GraphNode* Node, Range new_abstract_state){
 	APInt newLower = newInterval.getLower();
 	APInt newUpper = newInterval.getUpper();
 
+
+
 	if (oldInterval.isUnknown())
 		out_state[Node] = newInterval;
 	else {
-		APInt oldLower = oldInterval.getLower();
-		APInt oldUpper = oldInterval.getUpper();
-		APInt newLower = newInterval.getLower();
-		APInt newUpper = newInterval.getUpper();
-		if (newLower.slt(oldLower))
-			if (newUpper.sgt(oldUpper))
-				out_state[Node] = Range(Min, Max);
-			else
-				out_state[Node] = Range(Min, oldUpper);
-		else if (newUpper.sgt(oldUpper))
-			out_state[Node] = Range(oldLower, Max);
+
+		if (widening_count[Node] < MaxIterationCount) {
+			out_state[Node] = oldInterval.unionWith(newInterval);
+			widening_count[Node]++;
+		} else {
+			//Widening
+			APInt oldLower = oldInterval.getLower();
+			APInt oldUpper = oldInterval.getUpper();
+			APInt newLower = newInterval.getLower();
+			APInt newUpper = newInterval.getUpper();
+			if (newLower.slt(oldLower))
+				if (newUpper.sgt(oldUpper))
+					out_state[Node] = Range(Min, Max);
+				else
+					out_state[Node] = Range(Min, oldUpper);
+			else if (newUpper.sgt(oldUpper))
+				out_state[Node] = Range(oldLower, Max);
+		}
 	}
+
+
+	errs() << " ( before: ";
+	oldInterval.print(errs());
+	errs() << " after: ";
+	out_state[Node].print(errs());
+	errs() << ") ";
 
 	bool hasChanged = oldInterval != out_state[Node];
 
@@ -303,6 +322,7 @@ bool llvm::RangeAnalysis::join(GraphNode* Node, Range new_abstract_state){
 
 bool llvm::RangeAnalysis::meet(GraphNode* Node, Range new_abstract_state){
 
+	Range oldInterval = out_state[Node];
 	APInt oLower = out_state[Node].getLower();
 	APInt oUpper = out_state[Node].getUpper();
 	Range newInterval = new_abstract_state;
@@ -310,29 +330,44 @@ bool llvm::RangeAnalysis::meet(GraphNode* Node, Range new_abstract_state){
 	APInt nLower = newInterval.getLower();
 	APInt nUpper = newInterval.getUpper();
 
-	bool hasChanged = false;
+	if (narrowing_count[Node] < MaxIterationCount) {
 
-	if (oLower.eq(Min) && nLower.ne(Min)) {
-		out_state[Node] = Range(nLower, oUpper);
-		hasChanged = true;
-	} else {
-		APInt smin = APIntOps::smin(oLower, nLower);
-		if (oLower.ne(smin)) {
-			out_state[Node] = Range(smin, oUpper);
-			hasChanged = true;
+		if (oLower.eq(Min) && nLower.ne(Min)) {
+			out_state[Node] = Range(nLower, oUpper);
+		} else {
+			APInt smin = APIntOps::smin(oLower, nLower);
+			if (oLower.ne(smin)) {
+				out_state[Node] = Range(smin, oUpper);
+			}
+		}
+
+		if (oUpper.eq(Max) && nUpper.ne(Max)) {
+			out_state[Node] = Range(out_state[Node].getLower(), nUpper);
+		} else {
+			APInt smax = APIntOps::smax(oUpper, nUpper);
+			if (oUpper.ne(smax)) {
+				out_state[Node] = Range(out_state[Node].getLower(), smax);
+			}
+		}
+
+	}
+
+	if (SigmaOpNode* Sigma = dyn_cast<SigmaOpNode>(Node)){
+
+		errs() << " Sigma! ";
+
+		if (branchConstraints.count(Sigma) > 0) {
+
+			errs() << "branchConstraints:";
+			branchConstraints[Sigma]->getRange().print(errs());
+
+			out_state[Node] = out_state[Node].intersectWith(branchConstraints[Sigma]->getRange());
 		}
 	}
 
-	if (oUpper.eq(Max) && nUpper.ne(Max)) {
-		out_state[Node] = Range(out_state[Node].getLower(), nUpper);
-		hasChanged = true;
-	} else {
-		APInt smax = APIntOps::smax(oUpper, nUpper);
-		if (oUpper.ne(smax)) {
-			out_state[Node] = Range(out_state[Node].getLower(), smax);
-			hasChanged = true;
-		}
-	}
+	bool hasChanged = oldInterval != out_state[Node];
+
+	if (hasChanged) narrowing_count[Node]++;
 
 	return hasChanged;
 }
@@ -352,8 +387,6 @@ void llvm::RangeAnalysis::fixFutures(int SCCid) {
 					GraphNode* ControlDep = Node->getOperand(0, etControl);
 
 					SI->fixIntersects(out_state[ControlDep]);
-
-					out_state[Node] = out_state[Node].intersectWith(SI->getRange());
 
 				}
 
@@ -405,8 +438,14 @@ void llvm::RangeAnalysis::addConstraints(
 						if(Idx >= 0){
 							//Save the symbolic interval of the opNode. We will use it in the narrowing
 							// phase of the range analysis
+
 							BasicInterval* BI = CurrentVSM->getItv(Idx);
 							branchConstraints[CurrentSigmaOpNode] = BI;
+
+							errs() << *CurrentValue << "BranchConstraint adicionado: "
+								   << CurrentSigmaOpNode->getLabel() << " ";
+							BI->getRange().print(errs());
+							errs() << "\n";
 
 							//If it is a symbolic interval, then we have a future value and we must
 							//insert a control dependence edge in the graph.
@@ -460,22 +499,38 @@ void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 
 		GraphNode* node = it.getNext();
 
-		if (lo == loJoin) currentSCC.push_back(node);
+		//Things to do in the first fixPoint iteration (growth analysis)
+		if (lo == loJoin) {
+			currentSCC.push_back(node);
 
-		out_state[node] = Range(Min, Max, Unknown);
+			//Initialize abstract state
+			out_state[node] = Range(Min, Max, Unknown);
+			widening_count[node] = 0;
+			narrowing_count[node] = 0;
+		}
 
 		std::map<GraphNode*, edgeType> preds = node->getPredecessors();
 		if (preds.size() == 0) {
 			worklist.insert(node);
 		} else {
-			for(std::map<GraphNode*, edgeType>::iterator pred = preds.begin(), pred_end = preds.end(); pred != pred_end; pred++){
-				//Only data dependence edges
-				if(pred->second != etData) continue;
 
-				//looking for nodes that receive information from outside the SCC
-				if(depGraph->getSCCID(pred->first) != SCCid) {
-					worklist.insert(node);
-					break;
+			//Add the Sigma Nodes to the worklist of the narrowing,
+			//even if they do not receive data from outside the SCC
+			if (lo == loMeet) {
+				if(SigmaOpNode* Sigma = dyn_cast<SigmaOpNode>(node)){
+					worklist.insert(Sigma);
+				}
+			} else {
+
+				//Look for nodes that receive information from outside the SCC
+				for(std::map<GraphNode*, edgeType>::iterator pred = preds.begin(), pred_end = preds.end(); pred != pred_end; pred++){
+					//Only data dependence edges
+					if(pred->second != etData) continue;
+
+					if(depGraph->getSCCID(pred->first) != SCCid) {
+						worklist.insert(node);
+						break;
+					}
 				}
 			}
 		}

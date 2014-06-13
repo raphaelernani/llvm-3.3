@@ -257,6 +257,8 @@ BranchAnalysis::~BranchAnalysis(){
 
 bool BranchAnalysis::runOnFunction(Function& F){
 
+	IntervalConstraints.clear();
+
 	for (Function::const_iterator iBB = F.begin(), eBB = F.end(); iBB != eBB;
 			++iBB) {
 		const TerminatorInst* ti = iBB->getTerminator();

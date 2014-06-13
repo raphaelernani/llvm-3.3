@@ -22,6 +22,7 @@
 #include "BranchAnalysis.h"
 #include "Range.h"
 
+#define MaxIterationCount 1
 
 namespace llvm {
 
@@ -37,6 +38,8 @@ private:
 
 	std::map<SigmaOpNode*, BasicInterval*> branchConstraints;
 	std::map<GraphNode*,Range> out_state;
+	std::map<GraphNode*,int> widening_count;
+	std::map<GraphNode*,int> narrowing_count;
 
 	void fixPointIteration(int SCCid, LatticeOperation lo);
 
