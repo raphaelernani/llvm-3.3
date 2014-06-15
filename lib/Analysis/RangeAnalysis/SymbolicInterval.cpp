@@ -58,8 +58,6 @@ void SymbInterval::fixIntersects(Range boundRange) {
 	default:
 		this->setRange(Range(Min, Max));
 	}
-
-	this->setRange(Range(Min, Max));
 }
 
 // Print name of variable according to its type

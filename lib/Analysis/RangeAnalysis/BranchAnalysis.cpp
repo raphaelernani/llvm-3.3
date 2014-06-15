@@ -135,6 +135,7 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		}
 
 		Range TValues = Range(sigMin, sigMax);
+		TValues.print(errs());
 
 		// If we're interested in the false dest, invert the condition.
 		ConstantRange tmpF = tmpT.inverse();
@@ -153,6 +154,7 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		}
 
 		Range FValues = Range(sigMin, sigMax);
+		FValues.print(errs());
 
 		// Create the interval using the intersection in the branch.
 		BasicInterval* BT = new BasicInterval(TValues);
@@ -190,6 +192,12 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		const Value* Op0 = ici->getOperand(0);
 		SymbInterval* STOp0 = new SymbInterval(CR, Op1, pred);
 		SymbInterval* SFOp0 = new SymbInterval(CR, Op1, invPred);
+
+		errs() << *Op0 << " ";
+		STOp0->print(errs());
+		errs() << " ";
+		SFOp0->print(errs());
+		errs() << "\n";
 
 		ValueBranchMap* VBMOp0 = new ValueBranchMap(Op0, TBlock, FBlock, STOp0, SFOp0);
 		IntervalConstraints[Op0].push_back(VBMOp0);
@@ -234,11 +242,70 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 
 bool BranchAnalysis::doInitialization(Module &M){
 
+	MAX_BIT_INT = getMaxBitWidth(M);
+	updateMinMax(MAX_BIT_INT);
+
 	numSwitchesAnalyzed = 0;
 	numBranchesAnalyzed = 0;
 
 	//We do not change the program; return false
 	return false;
+}
+
+unsigned llvm::BranchAnalysis::getMaxBitWidth(Module& M) {
+	unsigned max = 0;
+	// Search through the functions for the max int bitwidth
+	for (Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; ++Fit) {
+		if (!Fit->isDeclaration()) {
+			unsigned bitwidth = getMaxBitWidth(*Fit);
+
+			if (bitwidth > max)
+				max = bitwidth;
+		}
+	}
+	return max;
+}
+
+unsigned llvm::BranchAnalysis::getMaxBitWidth(Function& F) {
+
+	unsigned int InstBitSize = 0, opBitSize = 0, max = 0;
+
+	// Obtains the maximum bit width of the instructions of the function.
+	for (Function::iterator BBit = F.begin(), BBend = F.end(); BBit != BBend; BBit++){
+
+		for (BasicBlock::iterator Iit = BBit->begin(), Iend = BBit->end(); Iit != Iend;  Iit++){
+
+			Instruction* I = Iit;
+
+			InstBitSize = I->getType()->getPrimitiveSizeInBits();
+			if (I->getType()->isIntegerTy() && InstBitSize > max) {
+				max = InstBitSize;
+			}
+
+			// Obtains the maximum bit width of the operands of the instruction.
+			User::const_op_iterator bgn = I->op_begin(), end = I->op_end();
+			for (; bgn != end; ++bgn) {
+				opBitSize = (*bgn)->getType()->getPrimitiveSizeInBits();
+				if ((*bgn)->getType()->isIntegerTy() && opBitSize > max) {
+					max = opBitSize;
+				}
+			}
+
+		}
+
+	}
+
+	// Bitwidth equal to 0 is not valid, so we increment to 1
+	if (max == 0) ++max;
+
+	return max;
+}
+
+void llvm::BranchAnalysis::updateMinMax(unsigned maxBitWidth) {
+	// Updates the Min and Max values.
+	Min = APInt::getSignedMinValue(maxBitWidth);
+	Max = APInt::getSignedMaxValue(maxBitWidth);
+	Zero = APInt(MAX_BIT_INT, 0, true);
 }
 
 BranchAnalysis::~BranchAnalysis(){

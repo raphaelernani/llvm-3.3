@@ -64,10 +64,6 @@ protected:
 public:
 	DepGraph* depGraph;
 
-	static unsigned getMaxBitWidth(Module &M);
-	static unsigned getMaxBitWidth(Function &F);
-	static void updateMinMax(unsigned maxBitWidth);
-
 	RangeAnalysis(): depGraph(NULL) {};
 	virtual ~RangeAnalysis() {};
 

@@ -86,8 +86,8 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 	 */
 	else if (BinaryOpNode* BOP = dyn_cast<BinaryOpNode>(Node)) {
 
-		GraphNode* Op1 = BOP->getOperand(0, etData);
-		GraphNode* Op2 = BOP->getOperand(1, etData);
+		GraphNode* Op1 = BOP->getOperand(0);
+		GraphNode* Op2 = BOP->getOperand(1);
 
 		errs() << "  Op1:" << Op1->getLabel();
 		out_state[Op1].print(errs());
@@ -103,7 +103,7 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 	 */
 	else if (UnaryOpNode* UOP = dyn_cast<UnaryOpNode>(Node)) {
 
-		GraphNode* Op = UOP->getOperand();
+		GraphNode* Op = UOP->getOperand(0);
 
 		result = abstractInterpretation(out_state[Op], UOP->getUnaryInstruction());
 	}
@@ -116,7 +116,7 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 
 			switch (I->getOpcode()) {
 			case Instruction::Store:
-				GraphNode* Op = OP->getOperand(0);
+				GraphNode* Op = OP->getIncomingNode(0);
 				result = abstractInterpretation(out_state[Op], I);
 				break;
 			}
@@ -384,7 +384,15 @@ void llvm::RangeAnalysis::fixFutures(int SCCid) {
 
 				if (SymbInterval* SI = dyn_cast<SymbInterval>(branchConstraints[Node])) {
 
-					GraphNode* ControlDep = Node->getOperand(0, etControl);
+					errs() << "Fixing constraints for " << Node->getLabel();
+					SI->print(errs());
+
+					GraphNode* ControlDep = Node->getIncomingNode(0, etControl);
+
+					errs() << " -> " << ControlDep->getLabel();
+					errs() << " ";
+					out_state[ControlDep].print(errs());
+					errs() << "\n";
 
 					SI->fixIntersects(out_state[ControlDep]);
 
@@ -444,7 +452,7 @@ void llvm::RangeAnalysis::addConstraints(
 
 							errs() << *CurrentValue << "BranchConstraint adicionado: "
 								   << CurrentSigmaOpNode->getLabel() << " ";
-							BI->getRange().print(errs());
+							BI->print(errs());
 							errs() << "\n";
 
 							//If it is a symbolic interval, then we have a future value and we must
@@ -558,62 +566,6 @@ void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 
 }
 
-unsigned llvm::RangeAnalysis::getMaxBitWidth(Module& M) {
-	unsigned max = 0;
-	// Search through the functions for the max int bitwidth
-	for (Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; ++Fit) {
-		if (!Fit->isDeclaration()) {
-			unsigned bitwidth = RangeAnalysis::getMaxBitWidth(*Fit);
-
-			if (bitwidth > max)
-				max = bitwidth;
-		}
-	}
-	return max;
-}
-
-unsigned llvm::RangeAnalysis::getMaxBitWidth(Function& F) {
-
-	unsigned int InstBitSize = 0, opBitSize = 0, max = 0;
-
-	// Obtains the maximum bit width of the instructions of the function.
-	for (Function::iterator BBit = F.begin(), BBend = F.end(); BBit != BBend; BBit++){
-
-		for (BasicBlock::iterator Iit = BBit->begin(), Iend = BBit->end(); Iit != Iend;  Iit++){
-
-			Instruction* I = Iit;
-
-			InstBitSize = I->getType()->getPrimitiveSizeInBits();
-			if (I->getType()->isIntegerTy() && InstBitSize > max) {
-				max = InstBitSize;
-			}
-
-			// Obtains the maximum bit width of the operands of the instruction.
-			User::const_op_iterator bgn = I->op_begin(), end = I->op_end();
-			for (; bgn != end; ++bgn) {
-				opBitSize = (*bgn)->getType()->getPrimitiveSizeInBits();
-				if ((*bgn)->getType()->isIntegerTy() && opBitSize > max) {
-					max = opBitSize;
-				}
-			}
-
-		}
-
-	}
-
-	// Bitwidth equal to 0 is not valid, so we increment to 1
-	if (max == 0) ++max;
-
-	return max;
-}
-
-void llvm::RangeAnalysis::updateMinMax(unsigned maxBitWidth) {
-	// Updates the Min and Max values.
-	Min = APInt::getSignedMinValue(maxBitWidth);
-	Max = APInt::getSignedMaxValue(maxBitWidth);
-	Zero = APInt(MAX_BIT_INT, 0, true);
-}
-
 Range llvm::RangeAnalysis::getRange(Value* V) {
 
 	if (GraphNode* Node = depGraph->findNode(V) )
@@ -629,9 +581,6 @@ Range llvm::RangeAnalysis::getRange(Value* V) {
  *************************************************************************/
 
 bool IntraProceduralRA::runOnFunction(Function& F) {
-
-	MAX_BIT_INT = getMaxBitWidth(F);
-	updateMinMax(MAX_BIT_INT);
 
 	//Build intra-procedural dependence graph
 	functionDepGraph& M_DepGraph = getAnalysis<functionDepGraph>();
@@ -659,9 +608,6 @@ static RegisterPass<IntraProceduralRA> X("ra-intra",
  *************************************************************************/
 
 bool InterProceduralRA::runOnModule(Module& M) {
-
-	MAX_BIT_INT = getMaxBitWidth(M);
-	updateMinMax(MAX_BIT_INT);
 
 	//Build inter-procedural dependence graph
 	moduleDepGraph& M_DepGraph = getAnalysis<moduleDepGraph>();

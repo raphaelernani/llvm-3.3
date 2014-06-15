@@ -8,11 +8,15 @@
 #ifndef BRANCHANALYSIS_H_
 #define BRANCHANALYSIS_H_
 
+
+
 //std includes
 #include <map>
 #include <list>
 
 //LLVM includes
+#include "llvm/Pass.h"
+#include "llvm/IR/Module.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/ConstantRange.h"
@@ -20,7 +24,6 @@
 //Our own stuff
 #include "SymbolicInterval.h"
 #include "ValueBranchMap.h"
-
 
 
 using namespace std;
@@ -35,6 +38,10 @@ public:
 	static char ID;
 	BranchAnalysis(): FunctionPass(ID) {}
 	virtual ~BranchAnalysis();
+
+	static unsigned getMaxBitWidth(Module &M);
+	static unsigned getMaxBitWidth(Function &F);
+	static void updateMinMax(unsigned maxBitWidth);
 
 	bool runOnFunction(Function &F);
 	virtual bool doInitialization(Module &M);

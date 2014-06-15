@@ -174,7 +174,7 @@ GraphNode* llvm::OpNode::clone() {
 
 }
 
-GraphNode* llvm::OpNode::getOperand(unsigned int index, edgeType et){
+GraphNode* llvm::OpNode::getIncomingNode(unsigned int index, edgeType et){
 
 	GraphNode* result = NULL;
 
@@ -191,6 +191,29 @@ GraphNode* llvm::OpNode::getOperand(unsigned int index, edgeType et){
 
 		}
 
+	}
+
+	return result;
+
+}
+
+GraphNode* llvm::OpNode::getOperand(unsigned int index){
+
+	GraphNode* result = NULL;
+
+	if (Value* V = inst->getOperand(index)){
+
+		std::map<GraphNode*, edgeType>::iterator pred, pred_end;
+		for(pred = predecessors.begin(), pred_end = predecessors.end(); pred != pred_end; pred++){
+
+			if (VarNode* VN = dyn_cast<VarNode>(pred->first)) {
+
+				if(V == VN->getValue()) {
+					result = pred->first;
+					break;
+				}
+			}
+		}
 	}
 
 	return result;

@@ -160,7 +160,8 @@ public:
         void setOpCode(unsigned int opCode);
         Instruction* getOperation() {return inst;};
 
-        virtual GraphNode* getOperand(unsigned int index = 0, edgeType et = etData);
+        virtual GraphNode* getIncomingNode(unsigned int index = 0, edgeType et = etData);
+        virtual GraphNode* getOperand(unsigned int index);
 
         virtual std::string getLabel();
         virtual std::string getShape();
