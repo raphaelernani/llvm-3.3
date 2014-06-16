@@ -21,30 +21,44 @@ cl::opt<std::string> RAIgnoredFunctions("ra-ignore-functions",
 		                               cl::init(""),
 		                               cl::NotHidden);
 
+
+
+/*
+ * method solve
+ *
+ * Solves the range analysis. At this point, the dependence graph is already
+ * computed and the constraints have already been extracted.
+ * In addition, the control dependence edges have already been added to the graph.
+ */
 void llvm::RangeAnalysis::solve() {
 
 	depGraph->recomputeSCCs();
-
 	std::list<int> SCCorder = depGraph->getSCCTopologicalOrder();
 
+	//Iterate over the SCCs of the dependence graph in topological order
 	for(std::list<int>::iterator SCCit = SCCorder.begin(), SCCend = SCCorder.end(); SCCit != SCCend; SCCit++ ){
 
 		int SCCid = *SCCit;
 
-		growthAnalysis(SCCid);
-		fixFutures(SCCid);
-		narrowingAnalysis(SCCid);
+		//Growth Analysis
+		fixPointIteration(SCCid, loJoin);
 
+		//Future Resolution
+		fixFutures(SCCid);
+
+		//Narrowing Analysis
+		fixPointIteration(SCCid, loMeet);
 	}
 
 }
 
-void llvm::RangeAnalysis::growthAnalysis(int SCCid) {
-
-	fixPointIteration(SCCid, loJoin);
-
-}
-
+/*
+ * function evaluateNode
+ *
+ * Given a node, this function computes the abstract state of the node
+ * considering the abstract state of the node's predecessors and the
+ * semantics of the node.
+ */
 Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 
 	Range result;
@@ -100,8 +114,6 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 
 		GraphNode* Op = UOP->getIncomingNode(0);
 
-		errs() << "OP: " << Op->getLabel();
-
 		result = abstractInterpretation(out_state[Op], UOP->getUnaryInstruction());
 	}
 	/*
@@ -126,6 +138,13 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 	return result;
 }
 
+
+/*
+ * function getUnionOfPredecessors
+ *
+ * Returns the union of the abstract states of the
+ * predecessors of the node passed as the parameter.
+ */
 Range llvm::RangeAnalysis::getUnionOfPredecessors(GraphNode* Node){
 	Range result(Min, Max, Unknown);
 
@@ -220,11 +239,6 @@ Range llvm::RangeAnalysis::abstractInterpretation(Range Op1, Instruction *I){
 }
 
 
-void fixPointIteration(int SCCid, bool(*latticeOperation)(GraphNode*, Range)){
-
-}
-
-
 /*
  * Here we do the abstract interpretation.
  *
@@ -237,27 +251,22 @@ void fixPointIteration(int SCCid, bool(*latticeOperation)(GraphNode*, Range)){
  */
 void llvm::RangeAnalysis::computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist, LatticeOperation lo){
 
-	errs() << "Evaluating node " << Node->getLabel() << "... ";
-
 	Range new_out_state = evaluateNode(Node);
-
-	new_out_state.print(errs());
 
 	bool hasChanged = (lo == loJoin ? join(Node, new_out_state) : meet(Node, new_out_state));
 
 	if (hasChanged) {
-
-		errs() << " * ";
-
 		//The range of this node has changed. Add its successors to the worklist.
 		addSuccessorsToWorklist(Node, Worklist);
 	}
 
-	errs() << " >>> ";
-	out_state[Node].print(errs());
-	errs() << "\n";
 }
 
+/*
+ * method addSuccessorsToWorklist
+ *
+ * Insert the successors of a node in the worklist
+ */
 void llvm::RangeAnalysis::addSuccessorsToWorklist(GraphNode* Node, std::set<GraphNode*> &Worklist){
 
 	int SCCid = depGraph->getSCCID(Node);
@@ -274,12 +283,19 @@ void llvm::RangeAnalysis::addSuccessorsToWorklist(GraphNode* Node, std::set<Grap
 
 }
 
+/*
+ * function join
+ *
+ * Here we perform the join operation in the interval lattice,
+ * using Cousot's widening operator. We join the current abstract state
+ * with the new_abstract_state and update the current abstract state of
+ * the node.
+ *
+ * This function returns true if the current abstract state has changed.
+ */
 bool llvm::RangeAnalysis::join(GraphNode* Node, Range new_abstract_state){
 
-	/*
-	 * Here we perform the join operation in the interval lattice,
-	 * with Cousot's widening operator.
-	 */
+
 
 	Range oldInterval = out_state[Node];
 	Range newInterval = new_abstract_state;
@@ -319,6 +335,17 @@ bool llvm::RangeAnalysis::join(GraphNode* Node, Range new_abstract_state){
 	return hasChanged;
 }
 
+
+/*
+ * function meet
+ *
+ * Here we perform the meet operation in the interval lattice,
+ * using Cousot's narrowing operator. We meet the current abstract state
+ * with the new_abstract_state and update the current abstract state of
+ * the node.
+ *
+ * This function returns true if the current abstract state has changed.
+ */
 bool llvm::RangeAnalysis::meet(GraphNode* Node, Range new_abstract_state){
 
 	Range oldInterval = out_state[Node];
@@ -365,6 +392,13 @@ bool llvm::RangeAnalysis::meet(GraphNode* Node, Range new_abstract_state){
 	return hasChanged;
 }
 
+
+/*
+ * method fixFutures
+ *
+ * Here we replace the future values of the Sigma's constraints with
+ * actual values.
+ */
 void llvm::RangeAnalysis::fixFutures(int SCCid) {
 
 	SCC_Iterator it(depGraph, SCCid);
@@ -386,12 +420,14 @@ void llvm::RangeAnalysis::fixFutures(int SCCid) {
 	}
 }
 
-void llvm::RangeAnalysis::narrowingAnalysis(int SCCid) {
-
-	fixPointIteration(SCCid, loMeet);
-
-}
-
+/*
+ * method addConstraints
+ *
+ * Here we take a set of constraints extracted from the program's
+ * CFG and add them to the Dependence Graph.
+ *
+ * We also insert control dependence edges as needed.
+ */
 void llvm::RangeAnalysis::addConstraints(
 		std::map<const Value*, std::list<ValueSwitchMap*> > constraints) {
 
@@ -447,17 +483,12 @@ void llvm::RangeAnalysis::addConstraints(
 	}
 }
 
-struct pipe_is_space : std::ctype<char> {
-  pipe_is_space() : std::ctype<char>(get_table()) {}
-  static mask const* get_table()
-  {
-    static mask rc[table_size];
-    rc['|'] = std::ctype_base::space;
-    rc['\n'] = std::ctype_base::space;
-    return &rc[0];
-  }
-};
-
+/*
+ * method importInitialStates
+ *
+ * Here we read the file specified by RAFilename and initialize the
+ * abstract states of the selected nodes in the graph.
+ */
 void llvm::RangeAnalysis::importInitialStates(ModuleLookup& M){
 
 	if(RAFilename.empty()) return;
@@ -483,7 +514,6 @@ void llvm::RangeAnalysis::importInitialStates(ModuleLookup& M){
 
 			if(GraphNode* G = depGraph->findNode(V)){
 				initial_state[G] = Range(RangeString);
-				initial_state[G].print(errs());
 			}
 		}
 	}
@@ -491,6 +521,13 @@ void llvm::RangeAnalysis::importInitialStates(ModuleLookup& M){
 	File.close();
 }
 
+/*
+ * method loadIgnoredFunctions
+ *
+ * Here we read the file specified by FileName and build a set of
+ * functions that will not propagate abstract states to other nodes
+ * of the graph.
+ */
 void llvm::RangeAnalysis::loadIgnoredFunctions(std::string FileName){
 
 	if (FileName.empty()) return;
@@ -509,17 +546,32 @@ void llvm::RangeAnalysis::loadIgnoredFunctions(std::string FileName){
 	File.close();
 }
 
+/*
+ * method addIgnoredFunction
+ *
+ * Here we add to the list the name of the function that we want to ignore.
+ */
 void llvm::RangeAnalysis::addIgnoredFunction(std::string FunctionName){
 
 	if(!ignoredFunctions.count(FunctionName)) ignoredFunctions.insert(FunctionName);
 
 }
 
+/*
+ * function getInitialState
+ *
+ * Returns the initial state of a node in the Graph.
+ */
 Range llvm::RangeAnalysis::getInitialState(GraphNode* Node){
 	if (initial_state.count(Node)) return initial_state[Node];
 	return Range(Min, Max, Unknown);
 }
 
+/*
+ * method printSCCState
+ *
+ * Prints the abstract state of all the nodes of a SCC
+ */
 void llvm::RangeAnalysis::printSCCState(int SCCid){
 
 	SCC_Iterator it(depGraph, SCCid);
@@ -535,6 +587,16 @@ void llvm::RangeAnalysis::printSCCState(int SCCid){
 	}
 }
 
+
+/*
+ * method fixPointIteration
+ *
+ * Implements a worklist algorithm that updates the abstract states
+ * of the nodes of the graph until a fixed point is reached.
+ *
+ * The LatticeOperation lo determines if the operation will be a widening
+ * or narrowing analysis.
+ */
 void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 
 	SCC_Iterator it(depGraph, SCCid);
@@ -698,25 +760,25 @@ bool InterProceduralRA::runOnModule(Module& M) {
 	solve();
 
 
-	errs() << "Computed ranges:\n";
-
-	for(Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; Fit++){
-
-		for (Function::iterator BBit = Fit->begin(), BBend = Fit->end(); BBit != BBend; BBit++){
-
-			for (BasicBlock::iterator Iit = BBit->begin(), Iend = BBit->end(); Iit != Iend; Iit++){
-
-				Instruction* I = Iit;
-
-				Range R = getRange(I);
-
-				errs() << I->getName() << "	";
-				R.print(errs());
-				errs() << "\n";
-			}
-
-		}
-	}
+//	errs() << "Computed ranges:\n";
+//
+//	for(Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; Fit++){
+//
+//		for (Function::iterator BBit = Fit->begin(), BBend = Fit->end(); BBit != BBend; BBit++){
+//
+//			for (BasicBlock::iterator Iit = BBit->begin(), Iend = BBit->end(); Iit != Iend; Iit++){
+//
+//				Instruction* I = Iit;
+//
+//				Range R = getRange(I);
+//
+//				errs() << I->getName() << "	";
+//				R.print(errs());
+//				errs() << "\n";
+//			}
+//
+//		}
+//	}
 
 
 	return false;

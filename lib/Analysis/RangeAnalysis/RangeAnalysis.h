@@ -38,23 +38,19 @@ typedef enum {
 
 class RangeAnalysis {
 private:
-	void growthAnalysis(int SCCid);
-	void fixFutures(int SCCid);
-	void narrowingAnalysis(int SCCid);
-
 	std::map<SigmaOpNode*, BasicInterval*> branchConstraints;
 	std::map<GraphNode*,Range> initial_state;
 	std::map<GraphNode*,Range> out_state;
 	std::map<GraphNode*,int> widening_count;
 	std::map<GraphNode*,int> narrowing_count;
-
 	std::set<std::string> ignoredFunctions;
 
 	void fixPointIteration(int SCCid, LatticeOperation lo);
-
+	void fixFutures(int SCCid);
 	void computeNode(GraphNode* Node, std::set<GraphNode*> &Worklist, LatticeOperation lo);
 	void addSuccessorsToWorklist(GraphNode* Node, std::set<GraphNode*> &Worklist);
 
+	Range getInitialState(GraphNode* Node);
 	Range evaluateNode(GraphNode* Node);
 	Range getUnionOfPredecessors(GraphNode* Node);
 	Range abstractInterpretation(Range Op1, Range Op2, Instruction *I);
@@ -64,8 +60,6 @@ private:
 	bool meet(GraphNode* Node, Range new_abstract_state);
 
 	void printSCCState(int SCCid);
-
-	Range getInitialState(GraphNode* Node);
 
 protected:
 	void solve();
