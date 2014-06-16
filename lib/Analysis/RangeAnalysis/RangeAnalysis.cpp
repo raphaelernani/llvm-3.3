@@ -7,8 +7,19 @@
 
 #include "RangeAnalysis.h"
 
-bool enable_debug;
+using namespace std;
 
+cl::opt<std::string> RAFilename("ra-filename",
+		                          cl::desc("Specify pre-computed ranges filename"),
+		                          cl::value_desc("filename"),
+		                          cl::init("stdin"),
+		                          cl::NotHidden);
+
+cl::opt<std::string> RAIgnoredFunctions("ra-ignore-functions",
+		                               cl::desc("Specify file with functions to be ignored"),
+		                               cl::value_desc("filename"),
+		                               cl::init(""),
+		                               cl::NotHidden);
 
 void llvm::RangeAnalysis::solve() {
 
@@ -20,19 +31,9 @@ void llvm::RangeAnalysis::solve() {
 
 		int SCCid = *SCCit;
 
-		depGraph->printSCC(SCCid, errs());
-
-		enable_debug = (SCCid == 0);
-
 		growthAnalysis(SCCid);
 		fixFutures(SCCid);
-
-		errs() << "\n\n\n========= NARROWING ========\n\n";
-
 		narrowingAnalysis(SCCid);
-
-		printSCCState(SCCid);
-		errs() << "\n";
 
 	}
 
@@ -89,12 +90,6 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 		GraphNode* Op1 = BOP->getOperand(0);
 		GraphNode* Op2 = BOP->getOperand(1);
 
-		errs() << "  Op1:" << Op1->getLabel();
-		out_state[Op1].print(errs());
-
-		errs() << "; Op2:" << Op2->getLabel();
-		out_state[Op2].print(errs());
-
 		result = abstractInterpretation(out_state[Op1], out_state[Op2], BOP->getBinaryOperator());
 	}
 	/*
@@ -103,7 +98,9 @@ Range llvm::RangeAnalysis::evaluateNode(GraphNode* Node){
 	 */
 	else if (UnaryOpNode* UOP = dyn_cast<UnaryOpNode>(Node)) {
 
-		GraphNode* Op = UOP->getOperand(0);
+		GraphNode* Op = UOP->getIncomingNode(0);
+
+		errs() << "OP: " << Op->getLabel();
 
 		result = abstractInterpretation(out_state[Op], UOP->getUnaryInstruction());
 	}
@@ -137,6 +134,14 @@ Range llvm::RangeAnalysis::getUnionOfPredecessors(GraphNode* Node){
 	for(pred = Preds.begin(), pred_end = Preds.end(); pred != pred_end; pred++){
 
 		if(pred->second == etData){
+
+			//Ignore the data that comes from ignored functions
+			if (CallNode* CI = dyn_cast<CallNode>(pred->first)){
+				Function* F = CI->getCalledFunction();
+				if (ignoredFunctions.count(F->getName())) continue;
+			}
+
+
 			result = result.unionWith(out_state[pred->first]);
 		}
 	}
@@ -198,6 +203,10 @@ Range llvm::RangeAnalysis::abstractInterpretation(Range Op1, Instruction *I){
 		case Instruction::Store:
 			result = Op1;
 			break;
+		case Instruction::BitCast: {
+			result = Op1;
+			break;
+		}
 		default:
 			errs() << "Unhandled UnaryInstruction:" << *I;
 			result = Range(Min, Max);
@@ -232,24 +241,21 @@ void llvm::RangeAnalysis::computeNode(GraphNode* Node, std::set<GraphNode*> &Wor
 
 	Range new_out_state = evaluateNode(Node);
 
-	errs() << "Result: ";
 	new_out_state.print(errs());
-	errs() <<"\n Meet/Join... ";
 
 	bool hasChanged = (lo == loJoin ? join(Node, new_out_state) : meet(Node, new_out_state));
 
-	errs() << "Result: ";
-	out_state[Node].print(errs());
-
-
 	if (hasChanged) {
+
 		errs() << " * ";
 
 		//The range of this node has changed. Add its successors to the worklist.
 		addSuccessorsToWorklist(Node, Worklist);
 	}
 
-	errs() <<"\n";
+	errs() << " >>> ";
+	out_state[Node].print(errs());
+	errs() << "\n";
 }
 
 void llvm::RangeAnalysis::addSuccessorsToWorklist(GraphNode* Node, std::set<GraphNode*> &Worklist){
@@ -308,13 +314,6 @@ bool llvm::RangeAnalysis::join(GraphNode* Node, Range new_abstract_state){
 		}
 	}
 
-
-	errs() << " ( before: ";
-	oldInterval.print(errs());
-	errs() << " after: ";
-	out_state[Node].print(errs());
-	errs() << ") ";
-
 	bool hasChanged = oldInterval != out_state[Node];
 
 	return hasChanged;
@@ -354,13 +353,7 @@ bool llvm::RangeAnalysis::meet(GraphNode* Node, Range new_abstract_state){
 
 	if (SigmaOpNode* Sigma = dyn_cast<SigmaOpNode>(Node)){
 
-		errs() << " Sigma! ";
-
 		if (branchConstraints.count(Sigma) > 0) {
-
-			errs() << "branchConstraints:";
-			branchConstraints[Sigma]->getRange().print(errs());
-
 			out_state[Node] = out_state[Node].intersectWith(branchConstraints[Sigma]->getRange());
 		}
 	}
@@ -384,26 +377,13 @@ void llvm::RangeAnalysis::fixFutures(int SCCid) {
 
 				if (SymbInterval* SI = dyn_cast<SymbInterval>(branchConstraints[Node])) {
 
-					errs() << "Fixing constraints for " << Node->getLabel();
-					SI->print(errs());
-
 					GraphNode* ControlDep = Node->getIncomingNode(0, etControl);
-
-					errs() << " -> " << ControlDep->getLabel();
-					errs() << " ";
-					out_state[ControlDep].print(errs());
-					errs() << "\n";
-
 					SI->fixIntersects(out_state[ControlDep]);
 
 				}
-
 			}
-
 		}
-
 	}
-
 }
 
 void llvm::RangeAnalysis::narrowingAnalysis(int SCCid) {
@@ -450,11 +430,6 @@ void llvm::RangeAnalysis::addConstraints(
 							BasicInterval* BI = CurrentVSM->getItv(Idx);
 							branchConstraints[CurrentSigmaOpNode] = BI;
 
-							errs() << *CurrentValue << "BranchConstraint adicionado: "
-								   << CurrentSigmaOpNode->getLabel() << " ";
-							BI->print(errs());
-							errs() << "\n";
-
 							//If it is a symbolic interval, then we have a future value and we must
 							//insert a control dependence edge in the graph.
 							if(SymbInterval* SI = dyn_cast<SymbInterval>(BI)){
@@ -462,22 +437,87 @@ void llvm::RangeAnalysis::addConstraints(
 								if (GraphNode* FutureValue = depGraph->findNode(SI->getBound())) {
 									depGraph->addEdge(FutureValue, CurrentSigmaOpNode, etControl);
 								}
-
 							}
-
 							break;
 						}
-
 					}
-
 				}
-
 			}
-
 		}
+	}
+}
 
+struct pipe_is_space : std::ctype<char> {
+  pipe_is_space() : std::ctype<char>(get_table()) {}
+  static mask const* get_table()
+  {
+    static mask rc[table_size];
+    rc['|'] = std::ctype_base::space;
+    rc['\n'] = std::ctype_base::space;
+    return &rc[0];
+  }
+};
+
+void llvm::RangeAnalysis::importInitialStates(ModuleLookup& M){
+
+	if(RAFilename.empty()) return;
+
+	ifstream File;
+	File.open(RAFilename.c_str(), ifstream::in);
+
+	std::string line;
+	while (std::getline(File, line))
+	{
+		std::size_t tam = line.size();
+		std::size_t pos = line.find_first_of("|");
+		std::string FunctionName = line.substr(0, pos);
+
+		line = line.substr(pos+1, tam-pos-1);
+		tam = line.size();
+		pos = line.find_first_of("|");
+		std::string ValueName = line.substr(0, pos);
+
+		std::string RangeString = line.substr(pos+1, tam-pos);
+
+		if(Value* V = M.getValueByName(FunctionName, ValueName)) {
+
+			if(GraphNode* G = depGraph->findNode(V)){
+				initial_state[G] = Range(RangeString);
+				initial_state[G].print(errs());
+			}
+		}
 	}
 
+	File.close();
+}
+
+void llvm::RangeAnalysis::loadIgnoredFunctions(std::string FileName){
+
+	if (FileName.empty()) return;
+
+	ifstream File;
+	File.open(FileName.c_str(), ifstream::in);
+
+	while(!File.eof()){
+
+		std::string FunctionName;
+		File >> FunctionName;
+
+		addIgnoredFunction(FunctionName);
+	}
+
+	File.close();
+}
+
+void llvm::RangeAnalysis::addIgnoredFunction(std::string FunctionName){
+
+	if(!ignoredFunctions.count(FunctionName)) ignoredFunctions.insert(FunctionName);
+
+}
+
+Range llvm::RangeAnalysis::getInitialState(GraphNode* Node){
+	if (initial_state.count(Node)) return initial_state[Node];
+	return Range(Min, Max, Unknown);
 }
 
 void llvm::RangeAnalysis::printSCCState(int SCCid){
@@ -512,7 +552,7 @@ void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 			currentSCC.push_back(node);
 
 			//Initialize abstract state
-			out_state[node] = Range(Min, Max, Unknown);
+			out_state[node] = getInitialState(node);
 			widening_count[node] = 0;
 			narrowing_count[node] = 0;
 		}
@@ -580,11 +620,23 @@ Range llvm::RangeAnalysis::getRange(Value* V) {
  * Class IntraProceduralRA
  *************************************************************************/
 
+void IntraProceduralRA::getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.addRequired<functionDepGraph> ();
+    AU.addRequired<BranchAnalysis> ();
+    if(!RAFilename.empty()) AU.addRequired<ModuleLookup> ();
+    AU.setPreservesAll();
+}
+
 bool IntraProceduralRA::runOnFunction(Function& F) {
 
 	//Build intra-procedural dependence graph
 	functionDepGraph& M_DepGraph = getAnalysis<functionDepGraph>();
 	depGraph = M_DepGraph.depGraph;
+
+	if(!RAFilename.empty()) {
+		ModuleLookup& ML = getAnalysis<ModuleLookup>();
+		importInitialStates(ML);
+	}
 
 	//Extract constraints from branch conditions
 	BranchAnalysis& brAnalysis = getAnalysis<BranchAnalysis>();
@@ -607,12 +659,26 @@ static RegisterPass<IntraProceduralRA> X("ra-intra",
  * Class InterProceduralRA
  *************************************************************************/
 
+void InterProceduralRA::getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.addRequired<moduleDepGraph> ();
+    AU.addRequired<BranchAnalysis> ();
+    if(!RAFilename.empty()) AU.addRequired<ModuleLookup> ();
+    AU.setPreservesAll();
+}
+
 bool InterProceduralRA::runOnModule(Module& M) {
 
 	//Build inter-procedural dependence graph
 	moduleDepGraph& M_DepGraph = getAnalysis<moduleDepGraph>();
 	depGraph = M_DepGraph.depGraph;
 
+	if(!RAFilename.empty()) {
+		ModuleLookup& ML = getAnalysis<ModuleLookup>();
+		importInitialStates(ML);
+	}
+
+	loadIgnoredFunctions(RAIgnoredFunctions);
+	addIgnoredFunction("malloc");
 
 	for(Module::iterator Fit = M.begin(), Fend = M.end(); Fit != Fend; Fit++){
 

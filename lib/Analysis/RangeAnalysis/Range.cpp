@@ -28,6 +28,65 @@ Range::Range(APInt lb, APInt ub, RangeType rType) :
     type = Empty;
 }
 
+int char2Int(char c){
+	return c - '0';
+}
+
+APInt string2APInt(std::string IntString){
+	bool minus = false;
+	unsigned int firstPosition = 0;
+
+	if (IntString.compare("-inf") == 0) return Min;
+	if (IntString.compare("+inf") == 0) return Max;
+
+	if (IntString.c_str()[0] == '-') {
+		minus = true;
+		firstPosition = 1;
+	}
+
+	uint64_t val = 0;
+	uint64_t base = 1;
+
+	for(unsigned int i = IntString.size() - 1; i >= firstPosition; i-- ){
+		val += char2Int(IntString.c_str()[i]) * base;
+		base *= 10;
+
+		//Avoiding Overflow
+		if (i==firstPosition) break;
+	}
+
+	if(minus) val = val * -1;
+
+	return APInt(MAX_BIT_INT, val, true);
+
+}
+
+Range::Range(const Range &Other): l(Other.l), u(Other.u), type(Other.type){
+}
+
+Range::Range(std::string RangeString){
+
+	//Remove square brackets
+	std::string Contents = RangeString.substr(1,RangeString.size() -2);
+
+	//Find comma
+	std::size_t cSize = Contents.size();
+	std::size_t commaPosition = Contents.find_first_of(",");
+
+	//Split contents in two
+	std::string lbStr = Contents.substr(0, commaPosition);
+	std::string ubStr = Contents.substr(commaPosition+2, (cSize-commaPosition)-2);
+
+	//Parse each of the bounds
+	APInt lb =  string2APInt(lbStr);
+	APInt ub =  string2APInt(ubStr);
+
+	l = lb;
+	u = ub;
+	type = Regular;
+
+}
+
 Range::~Range() {
 }
 
@@ -714,7 +773,12 @@ Range Range::zextOrTrunc(unsigned bitwidth) const {
 		maxlower = maxlower.sext(MAX_BIT_INT);
 	}
 
-	return Range(maxlower, maxupper);
+	// Check if source range is contained by max bit range
+	if (this->getLower().sge(maxlower) && this->getUpper().sle(maxupper)) {
+		return *this;
+	} else {
+		return Range(maxlower, maxupper);
+	}
 }
 
 Range Range::intersectWith(const Range& other) const {

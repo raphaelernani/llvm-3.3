@@ -135,7 +135,6 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		}
 
 		Range TValues = Range(sigMin, sigMax);
-		TValues.print(errs());
 
 		// If we're interested in the false dest, invert the condition.
 		ConstantRange tmpF = tmpT.inverse();
@@ -154,7 +153,6 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		}
 
 		Range FValues = Range(sigMin, sigMax);
-		FValues.print(errs());
 
 		// Create the interval using the intersection in the branch.
 		BasicInterval* BT = new BasicInterval(TValues);
@@ -192,12 +190,6 @@ void BranchAnalysis::buildValueBranchMap(const BranchInst *br) {
 		const Value* Op0 = ici->getOperand(0);
 		SymbInterval* STOp0 = new SymbInterval(CR, Op1, pred);
 		SymbInterval* SFOp0 = new SymbInterval(CR, Op1, invPred);
-
-		errs() << *Op0 << " ";
-		STOp0->print(errs());
-		errs() << " ";
-		SFOp0->print(errs());
-		errs() << "\n";
 
 		ValueBranchMap* VBMOp0 = new ValueBranchMap(Op0, TBlock, FBlock, STOp0, SFOp0);
 		IntervalConstraints[Op0].push_back(VBMOp0);

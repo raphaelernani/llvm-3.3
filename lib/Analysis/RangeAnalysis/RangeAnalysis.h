@@ -9,17 +9,23 @@
 #define RANGEANALYSIS_H_
 
 //std includes
+#include <locale>
+#include <iostream>
+#include <istream>
+#include <fstream>
 #include <list>
 #include <map>
 
 //LLVM includes
 #include "llvm/Pass.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/Support/CommandLine.h"
 
 
 //Our own stuff
 #include "../DepGraph/DepGraph.h"
-
 #include "BranchAnalysis.h"
+#include "ModuleLookup.h"
 #include "Range.h"
 
 #define MaxIterationCount 1
@@ -37,9 +43,12 @@ private:
 	void narrowingAnalysis(int SCCid);
 
 	std::map<SigmaOpNode*, BasicInterval*> branchConstraints;
+	std::map<GraphNode*,Range> initial_state;
 	std::map<GraphNode*,Range> out_state;
 	std::map<GraphNode*,int> widening_count;
 	std::map<GraphNode*,int> narrowing_count;
+
+	std::set<std::string> ignoredFunctions;
 
 	void fixPointIteration(int SCCid, LatticeOperation lo);
 
@@ -56,11 +65,15 @@ private:
 
 	void printSCCState(int SCCid);
 
+	Range getInitialState(GraphNode* Node);
 
 protected:
 	void solve();
 	void addConstraints(std::map<const Value*, std::list<ValueSwitchMap*> > constraints);
 
+	void importInitialStates(ModuleLookup& M);
+	void loadIgnoredFunctions(std::string FileName);
+	void addIgnoredFunction(std::string FunctionName);
 public:
 	DepGraph* depGraph;
 
@@ -80,13 +93,7 @@ public:
 	IntraProceduralRA():FunctionPass(ID){}
 	virtual ~IntraProceduralRA(){};
 
-    void getAnalysisUsage(AnalysisUsage &AU) const {
-        AU.addRequired<functionDepGraph> ();
-        AU.addRequired<BranchAnalysis> ();
-        AU.setPreservesAll();
-    }
-
-
+    void getAnalysisUsage(AnalysisUsage &AU) const;
 
     bool runOnFunction(Function &F);
 };
@@ -97,13 +104,7 @@ public:
 	InterProceduralRA():ModulePass(ID){}
 	virtual ~InterProceduralRA(){};
 
-    void getAnalysisUsage(AnalysisUsage &AU) const {
-        AU.addRequired<moduleDepGraph> ();
-        AU.addRequired<BranchAnalysis> ();
-        AU.setPreservesAll();
-    }
-
-
+    void getAnalysisUsage(AnalysisUsage &AU) const;
 
     bool runOnModule(Module &M);
 };

@@ -16,6 +16,8 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <string>
+
 //****************************************************************************//
 using namespace llvm;
 
@@ -53,7 +55,9 @@ private:
 
 public:
 	Range();
+	Range(const Range &Other);
 	Range(APInt lb, APInt ub, RangeType type = Regular);
+	Range(std::string RangeString);
 	~Range();
 	APInt getLower() const {return l;}
 	APInt getUpper() const {return u;}
