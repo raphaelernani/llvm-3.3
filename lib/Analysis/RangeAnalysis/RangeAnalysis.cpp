@@ -5,9 +5,37 @@
  *      Author: raphael
  */
 
+#define DEBUG_TYPE "range-analysis"
+
 #include "RangeAnalysis.h"
 
 using namespace std;
+
+//Bitwidth reduction statistics
+STATISTIC(usedBits, "Initial number of bits.");
+STATISTIC(needBits, "Needed bits.");
+STATISTIC(percentReduction, "Percentage of reduction of the number of bits.");
+
+//SCC statistics
+STATISTIC(numSCCs, "Number of strongly connected components.");
+STATISTIC(numAloneSCCs, "Number of SCCs containing only one node.");
+STATISTIC(sizeMaxSCC, "Size of largest SCC.");
+
+//Graph nodes statistics
+STATISTIC(numVars, "Number of variables");
+STATISTIC(numOps, "Number of operations");
+STATISTIC(numMems, "Number of memory nodes");
+
+//Range statistics
+STATISTIC(numUnknown, "Number of unknown ranges");
+STATISTIC(numEmpty, "Number of empty ranges");
+STATISTIC(numCPlusInf, "Number of [c, +inf].");
+STATISTIC(numCC, "Number of [c, c].");
+STATISTIC(numMinInfC, "Number of [-inf, c].");
+STATISTIC(numMaxRange, "Number of [-inf, +inf].");
+STATISTIC(numConstants, "Number of constants.");
+
+
 
 cl::opt<std::string> RAFilename("ra-filename",
 		                          cl::desc("Specify pre-computed ranges filename"),
@@ -35,6 +63,9 @@ void llvm::RangeAnalysis::solve() {
 	depGraph->recomputeSCCs();
 	std::list<int> SCCorder = depGraph->getSCCTopologicalOrder();
 
+	//Statistic: Number of SCCs
+	numSCCs += SCCorder.size();
+
 	//Iterate over the SCCs of the dependence graph in topological order
 	for(std::list<int>::iterator SCCit = SCCorder.begin(), SCCend = SCCorder.end(); SCCit != SCCend; SCCit++ ){
 
@@ -49,6 +80,8 @@ void llvm::RangeAnalysis::solve() {
 		//Narrowing Analysis
 		fixPointIteration(SCCid, loMeet);
 	}
+
+	computeStats();
 
 }
 
@@ -558,6 +591,118 @@ void llvm::RangeAnalysis::addIgnoredFunction(std::string FunctionName){
 }
 
 /*
+ * method computeStats
+ *
+ * computes the statistics that require the processing to be complete.
+ */
+void llvm::RangeAnalysis::computeStats(){
+
+	for(DepGraph::iterator It = depGraph->begin(), Iend = depGraph->end(); It != Iend; It++){
+
+		GraphNode* Node = *It;
+
+		bool isVariable = false;
+		unsigned int currentBitWidth;
+
+		//We only count precision statistics of VarNodes and MemNodes
+		if (isa<OpNode>(Node)) {
+			numOps++;
+			continue;
+		}
+
+		if (isa<MemNode>(Node)) {
+			numMems++;
+		} else if (VarNode* VN = dyn_cast<VarNode>(Node)){
+			Value* V = VN->getValue();
+
+			if (isa<ConstantInt>(V)){
+				numConstants++;
+			} else {
+
+				//Only Variables are considered for bitwidth reduction
+				isVariable = true;
+				numVars++;
+				currentBitWidth = V->getType()->getPrimitiveSizeInBits();
+				usedBits += currentBitWidth;
+			}
+
+		} else assert(false && "Unknown Node Type");
+
+		assert(out_state.count(Node) && "Node not found in the list of computed ranges.");
+
+		Range CR = out_state[Node];
+
+		// If range is unknown, we have total needed bits
+		if (CR.isUnknown()) {
+			++numUnknown;
+			if (isVariable) needBits += currentBitWidth;
+			continue;
+		}
+
+		// If range is empty, we have 0 needed bits
+		if (CR.isEmpty()) {
+			++numEmpty;
+			continue;
+		}
+
+		if (CR.getLower().eq(Min)) {
+			if (CR.getUpper().eq(Max)) {
+				++numMaxRange;
+			}
+			else {
+				++numMinInfC;
+			}
+		}
+		else if (CR.getUpper().eq(Max)) {
+			++numCPlusInf;
+		}
+		else {
+			++numCC;
+		}
+
+		//Compute needed bits >> only for variables
+		if (isVariable) {
+			unsigned ub, lb;
+
+			if (CR.getLower().isNegative()) {
+				APInt abs = CR.getLower().abs();
+				lb = abs.getActiveBits() + 1;
+			} else {
+				lb = CR.getLower().getActiveBits() + 1;
+			}
+
+			if (CR.getUpper().isNegative()) {
+				APInt abs = CR.getUpper().abs();
+				ub = abs.getActiveBits() + 1;
+			} else {
+				ub = CR.getUpper().getActiveBits() + 1;
+			}
+
+			unsigned nBits = lb > ub ? lb : ub;
+
+			// If both bounds are positive, decrement needed bits by 1
+			if (!CR.getLower().isNegative() && !CR.getUpper().isNegative()) {
+				--nBits;
+			}
+
+			if (nBits < currentBitWidth) {
+				needBits += nBits;
+			} else {
+				needBits += currentBitWidth;
+			}
+		}
+
+
+	}
+
+	double totalB = usedBits;
+	double needB = needBits;
+	double reduction = (double) (totalB - needB) * 100 / totalB;
+	percentReduction = (unsigned int) reduction;
+
+}
+
+/*
  * function getInitialState
  *
  * Returns the initial state of a node in the Graph.
@@ -656,6 +801,12 @@ void llvm::RangeAnalysis::fixPointIteration(int SCCid, LatticeOperation lo) {
 	}
 
 	if (lo == loJoin){
+
+		//Statistic: size of SCCs
+		unsigned int current_size = currentSCC.size();
+		if (current_size == 1) numAloneSCCs++;
+		else if (current_size > sizeMaxSCC) sizeMaxSCC = current_size;
+
 		for(std::list<GraphNode*>::iterator it = currentSCC.begin(), iend = currentSCC.end(); it != iend; it++){
 			GraphNode* currentNode = *it;
 

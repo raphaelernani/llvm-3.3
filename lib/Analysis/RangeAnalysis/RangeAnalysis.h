@@ -9,7 +9,6 @@
 #define RANGEANALYSIS_H_
 
 //std includes
-#include <locale>
 #include <iostream>
 #include <istream>
 #include <fstream>
@@ -18,6 +17,7 @@
 
 //LLVM includes
 #include "llvm/Pass.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -68,6 +68,8 @@ protected:
 	void importInitialStates(ModuleLookup& M);
 	void loadIgnoredFunctions(std::string FileName);
 	void addIgnoredFunction(std::string FunctionName);
+
+	void computeStats();
 public:
 	DepGraph* depGraph;
 
