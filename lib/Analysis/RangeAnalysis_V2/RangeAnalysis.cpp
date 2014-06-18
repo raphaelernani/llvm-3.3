@@ -601,7 +601,7 @@ void llvm::RangeAnalysis::computeStats(){
 
 		GraphNode* Node = *It;
 
-		bool isVariable = false;
+		bool isIntegerVariable = false;
 		unsigned int currentBitWidth;
 
 		//We only count precision statistics of VarNodes and MemNodes
@@ -620,10 +620,12 @@ void llvm::RangeAnalysis::computeStats(){
 			} else {
 
 				//Only Variables are considered for bitwidth reduction
-				isVariable = true;
+				isIntegerVariable = V->getType()->isIntegerTy();
 				numVars++;
-				currentBitWidth = V->getType()->getPrimitiveSizeInBits();
-				usedBits += currentBitWidth;
+				if(isIntegerVariable){
+					currentBitWidth = V->getType()->getPrimitiveSizeInBits();
+					usedBits += currentBitWidth;
+				}
 			}
 
 		} else assert(false && "Unknown Node Type");
@@ -635,7 +637,7 @@ void llvm::RangeAnalysis::computeStats(){
 		// If range is unknown, we have total needed bits
 		if (CR.isUnknown()) {
 			++numUnknown;
-			if (isVariable) needBits += currentBitWidth;
+			if (isIntegerVariable) needBits += currentBitWidth;
 			continue;
 		}
 
@@ -661,7 +663,7 @@ void llvm::RangeAnalysis::computeStats(){
 		}
 
 		//Compute needed bits >> only for variables
-		if (isVariable) {
+		if (isIntegerVariable) {
 			unsigned ub, lb;
 
 			if (CR.getLower().isNegative()) {
